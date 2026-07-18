@@ -1,4 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
+import mitreData from "../../data/mitre-groups.json";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +56,13 @@ function inferCategory(content: string) {
   const rules = [[/ransom|랜섬/i,"Ransomware"],[/vulnerab|cve-|zero[- ]day|취약점/i,"Vulnerability"],[/apt|nation.state|espionage|북한|중국|러시아/i,"Nation-state"],[/cloud|azure|aws|google cloud/i,"Cloud"],[/supply chain|공급망/i,"Supply chain"],[/malware|trojan|backdoor|악성코드/i,"Malware"],[/data breach|leak|유출|침해/i,"Data breach"]] as const;
   return rules.find(([rule])=>rule.test(content))?.[1] ?? "Cybersecurity";
 }
+function matchMitreGroups(content: string) {
+  const normalized = ` ${content.toLowerCase().replace(/[^a-z0-9가-힣]+/g," ")} `;
+  return mitreData.groups.filter(group => group.aliases.some(alias => {
+    const needle = alias.toLowerCase().replace(/[^a-z0-9가-힣]+/g," ").trim();
+    return needle.length >= 4 && normalized.includes(` ${needle} `);
+  })).map(group=>({id:group.id,key:group.key,mitreName:group.mitreName,aliases:group.aliases,mitreUrl:group.mitreUrl,version:group.version}));
+}
 function inferLocation(content: string, base: [number, number]) {
   const normalized = ` ${content.toLowerCase()} `;
   const hits = LOCATIONS.filter(location => location.aliases.some(alias => normalized.includes(alias)));
@@ -91,7 +99,7 @@ async function fetchSource(source: typeof SOURCES[number]) {
         const link = text(item.link) || text(item.guid);
         const publishedAt = text(item.pubDate ?? item.published ?? item.updated ?? item["dc:date"]);
         const combined = `${title} ${description}`;
-        return { id: hash(`${source.name}:${link || title}`), title, description, link: link || source.home, source: source.name, publishedAt: new Date(publishedAt || Date.now()).toISOString(), ...inferLocation(combined, source.base), severity: inferSeverity(combined), category: inferCategory(combined) };
+        return { id: hash(`${source.name}:${link || title}`), title, description, link: link || source.home, source: source.name, publishedAt: new Date(publishedAt || Date.now()).toISOString(), ...inferLocation(combined, source.base), severity: inferSeverity(combined), category: inferCategory(combined), mitreGroups:matchMitreGroups(combined) };
       }).filter(item => item.title && item.link);
       return { source: source.name, ok: true, count: items.length, items };
     } catch (error) { lastError = error instanceof Error ? error.message : String(error); }
