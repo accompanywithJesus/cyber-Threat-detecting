@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./mitre.css";
+import "./region.css";
 export const metadata: Metadata = {
   metadataBase:new URL("https://cyber-atlas-korea.accompanyoung.chatgpt.site"),
   title:"Cyber Atlas — 실시간 지정학 사이버 위협 지도",
