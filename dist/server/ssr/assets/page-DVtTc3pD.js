@@ -1,0 +1,5178 @@
+import { a as require_react, c as __toESM, t as require_jsx_runtime } from "../index.js";
+//#region app/components/ThreatGlobe.tsx
+var import_react = /* @__PURE__ */ __toESM(require_react(), 1);
+var import_jsx_runtime = require_jsx_runtime();
+var REGION_LABELS = [
+	{
+		lat: 49,
+		lng: -108,
+		label: "NORTH AMERICA",
+		kind: "region"
+	},
+	{
+		lat: -18,
+		lng: -62,
+		label: "SOUTH AMERICA",
+		kind: "region"
+	},
+	{
+		lat: 54,
+		lng: 17,
+		label: "EUROPE",
+		kind: "region"
+	},
+	{
+		lat: 7,
+		lng: 20,
+		label: "AFRICA",
+		kind: "region"
+	},
+	{
+		lat: 27,
+		lng: 44,
+		label: "MIDDLE EAST",
+		kind: "region"
+	},
+	{
+		lat: 44,
+		lng: 70,
+		label: "CENTRAL ASIA",
+		kind: "region"
+	},
+	{
+		lat: 39,
+		lng: 114,
+		label: "EAST ASIA",
+		kind: "region"
+	},
+	{
+		lat: 8,
+		lng: 109,
+		label: "SOUTHEAST ASIA",
+		kind: "region"
+	},
+	{
+		lat: -27,
+		lng: 135,
+		label: "OCEANIA",
+		kind: "region"
+	}
+];
+function ThreatGlobe({ items, activeId, selectedRegion, onRegionSelect }) {
+	const mountRef = (0, import_react.useRef)(null);
+	const globeRef = (0, import_react.useRef)(null);
+	const labelDataRef = (0, import_react.useRef)([]);
+	const callbackRef = (0, import_react.useRef)(onRegionSelect);
+	const [ready, setReady] = (0, import_react.useState)(false);
+	(0, import_react.useEffect)(() => {
+		callbackRef.current = onRegionSelect;
+	}, [onRegionSelect]);
+	(0, import_react.useEffect)(() => {
+		let disposed = false;
+		let cleanup = () => {};
+		(async () => {
+			const THREE = await import("./three.module-CgqD6IRY.js");
+			const [{ default: ThreeGlobeClass }, { OrbitControls }, topojson, geo] = await Promise.all([
+				import("./three-globe-CJt7z1Zp.js"),
+				import("./OrbitControls-qeaQjWDP.js"),
+				import("./src-B8S0mKZE.js"),
+				import("./src-BTPE9Ef8.js")
+			]);
+			const mount = mountRef.current;
+			if (!mount || disposed) return;
+			const world = await fetch("/geo/countries-110m.json").then((response) => response.json());
+			if (disposed) return;
+			const countries = topojson.feature(world, world.objects.countries).features;
+			labelDataRef.current = [...countries.flatMap((feature) => {
+				const country = feature.properties?.name;
+				if (!country) return [];
+				const [lng, lat] = geo.geoCentroid(feature);
+				if (!Number.isFinite(lat) || !Number.isFinite(lng)) return [];
+				return [{
+					lat,
+					lng,
+					label: country.toUpperCase(),
+					kind: "country",
+					country,
+					area: geo.geoArea(feature)
+				}];
+			}), ...REGION_LABELS];
+			const globe = new ThreeGlobeClass({
+				animateIn: true,
+				waitForGlobeReady: true
+			}).showAtmosphere(true).atmosphereColor("#35d8ff").atmosphereAltitude(.15).showGraticules(true).polygonsData(countries).polygonCapColor(() => "rgba(8,31,43,.72)").polygonSideColor(() => "rgba(4,17,24,.9)").polygonStrokeColor(() => "rgba(59,173,207,.42)").polygonAltitude(.008);
+			const material = globe.globeMaterial();
+			material.color = new THREE.Color("#03131c");
+			material.emissive = new THREE.Color("#061923");
+			material.emissiveIntensity = .72;
+			material.shininess = 18;
+			globeRef.current = globe;
+			setReady(true);
+			const scene = new THREE.Scene();
+			scene.fog = new THREE.FogExp2(132617, .0017);
+			scene.add(globe);
+			scene.add(new THREE.AmbientLight(6867432, 1.7));
+			const rim = new THREE.DirectionalLight(6088447, 4.2);
+			rim.position.set(-180, 90, 160);
+			scene.add(rim);
+			const warm = new THREE.PointLight(16735085, 2800, 500);
+			warm.position.set(170, -60, 100);
+			scene.add(warm);
+			const camera = new THREE.PerspectiveCamera(42, 1, .1, 1600);
+			camera.position.set(0, 0, 315);
+			const renderer = new THREE.WebGLRenderer({
+				antialias: true,
+				alpha: true,
+				powerPreference: "high-performance"
+			});
+			renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+			renderer.setClearColor(0, 0);
+			renderer.outputColorSpace = THREE.SRGBColorSpace;
+			mount.appendChild(renderer.domElement);
+			const controls = new OrbitControls(camera, renderer.domElement);
+			controls.enableDamping = true;
+			controls.dampingFactor = .055;
+			controls.enablePan = false;
+			controls.minDistance = 185;
+			controls.maxDistance = 440;
+			controls.autoRotate = true;
+			controls.autoRotateSpeed = .32;
+			const clickGeometry = new THREE.SphereGeometry(100.8, 64, 48);
+			const clickMaterial = new THREE.MeshBasicMaterial({
+				transparent: true,
+				opacity: 0,
+				depthWrite: false
+			});
+			const clickTarget = new THREE.Mesh(clickGeometry, clickMaterial);
+			scene.add(clickTarget);
+			const raycaster = new THREE.Raycaster();
+			const pointer = new THREE.Vector2();
+			let pointerStart = {
+				x: 0,
+				y: 0
+			};
+			let rotateTimer = 0;
+			const onPointerDown = (event) => {
+				pointerStart = {
+					x: event.clientX,
+					y: event.clientY
+				};
+				controls.autoRotate = false;
+				window.clearTimeout(rotateTimer);
+			};
+			const onPointerUp = (event) => {
+				const moved = Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y);
+				rotateTimer = window.setTimeout(() => {
+					controls.autoRotate = true;
+				}, 2600);
+				if (moved > 7) return;
+				const rect = renderer.domElement.getBoundingClientRect();
+				pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+				raycaster.setFromCamera(pointer, camera);
+				const hit = raycaster.intersectObject(clickTarget, false)[0];
+				if (!hit) return;
+				const coords = globe.toGeoCoords(hit.point);
+				const country = countries.find((feature) => geo.geoContains(feature, [coords.lng, coords.lat]));
+				if (country?.properties?.name) callbackRef.current?.({
+					country: country.properties.name,
+					lat: coords.lat,
+					lng: coords.lng
+				});
+			};
+			renderer.domElement.addEventListener("pointerdown", onPointerDown);
+			renderer.domElement.addEventListener("pointerup", onPointerUp);
+			const stars = new THREE.BufferGeometry();
+			const starCount = 900;
+			const positions = new Float32Array(starCount * 3);
+			for (let i = 0; i < starCount; i++) {
+				const radius = 390 + Math.random() * 500, theta = Math.random() * Math.PI * 2, phi = Math.acos(2 * Math.random() - 1);
+				positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+				positions[i * 3 + 1] = radius * Math.cos(phi);
+				positions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
+			}
+			stars.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+			const starMaterial = new THREE.PointsMaterial({
+				color: 5606560,
+				size: .75,
+				transparent: true,
+				opacity: .62,
+				sizeAttenuation: true
+			});
+			scene.add(new THREE.Points(stars, starMaterial));
+			const resize = () => {
+				const width = mount.clientWidth, height = mount.clientHeight;
+				renderer.setSize(width, height, false);
+				camera.aspect = width / Math.max(height, 1);
+				camera.updateProjectionMatrix();
+			};
+			const observer = new ResizeObserver(resize);
+			observer.observe(mount);
+			resize();
+			let frame = 0;
+			const animate = () => {
+				frame = requestAnimationFrame(animate);
+				controls.update();
+				renderer.render(scene, camera);
+			};
+			animate();
+			cleanup = () => {
+				cancelAnimationFrame(frame);
+				window.clearTimeout(rotateTimer);
+				observer.disconnect();
+				renderer.domElement.removeEventListener("pointerdown", onPointerDown);
+				renderer.domElement.removeEventListener("pointerup", onPointerUp);
+				controls.dispose();
+				renderer.dispose();
+				stars.dispose();
+				starMaterial.dispose();
+				clickGeometry.dispose();
+				clickMaterial.dispose();
+				if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement);
+				globeRef.current = null;
+				labelDataRef.current = [];
+				setReady(false);
+			};
+		})();
+		return () => {
+			disposed = true;
+			cleanup();
+		};
+	}, []);
+	(0, import_react.useEffect)(() => {
+		const globe = globeRef.current;
+		if (!globe || !ready) return;
+		const color = (severity) => severity === "critical" ? "#ff3f62" : severity === "high" ? "#ffb13b" : severity === "medium" ? "#25e9ff" : "#698690";
+		globe.polygonCapColor((data) => data.properties?.name === selectedRegion?.country ? "rgba(32,153,190,.72)" : "rgba(8,31,43,.72)").polygonStrokeColor((data) => data.properties?.name === selectedRegion?.country ? "#8cf4ff" : "rgba(59,173,207,.42)").polygonAltitude((data) => data.properties?.name === selectedRegion?.country ? .022 : .008);
+		const laserItems = items.filter((item) => Math.abs(item.originLat - item.lat) + Math.abs(item.originLng - item.lng) > 5);
+		const labels = labelDataRef.current;
+		globe.pointsData(items).pointLat("lat").pointLng("lng").pointColor((data) => color(data.severity)).pointAltitude((data) => data.id === activeId ? .1 : .045).pointRadius((data) => data.id === activeId ? .68 : .34).pointsTransitionDuration(350).arcsData(laserItems).arcStartLat("originLat").arcStartLng("originLng").arcEndLat("lat").arcEndLng("lng").arcColor((data) => [
+			"rgba(0,0,0,0)",
+			color(data.severity),
+			"#efffff"
+		]).arcAltitudeAutoScale(.17).arcStroke((data) => data.id === activeId ? .48 : .22).arcDashLength((data) => data.id === activeId ? .16 : .075).arcDashGap((data) => data.id === activeId ? .84 : .925).arcDashInitialGap(() => Math.random()).arcDashAnimateTime((data) => data.id === activeId ? 520 : 860).arcsTransitionDuration(250).ringsData([]).labelsData(labels).labelLat("lat").labelLng("lng").labelText("label").labelColor((data) => {
+			const label = data;
+			if (label.country === selectedRegion?.country) return "#efffff";
+			return label.kind === "region" ? "rgba(67,221,255,.94)" : "rgba(174,211,221,.78)";
+		}).labelSize((data) => {
+			const label = data;
+			if (label.country === selectedRegion?.country) return .76;
+			if (label.kind === "region") return .64;
+			if ((label.area || 0) > .025) return .43;
+			if ((label.area || 0) > .004) return .34;
+			return .25;
+		}).labelAltitude((data) => {
+			const label = data;
+			if (label.country === selectedRegion?.country) return .085;
+			return label.kind === "region" ? .052 : .018;
+		}).labelIncludeDot((data) => data.country === selectedRegion?.country).labelDotRadius(.14).labelResolution(3).labelsTransitionDuration(250);
+	}, [
+		items,
+		activeId,
+		selectedRegion,
+		ready
+	]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		ref: mountRef,
+		className: "globe-canvas",
+		"aria-label": "클릭 가능한 실시간 사이버 위협 3D 지구본"
+	});
+}
+var mitre_groups_default = {
+	dataset: {
+		"name": "Enterprise ATT&CK",
+		"version": "19.1",
+		"modified": "2026-05-12T14:00:00.188Z",
+		"source": "https://github.com/mitre-attack/attack-stix-data"
+	},
+	groups: [
+		{
+			"key": "APT1",
+			"caseAlias": "Unit 61398",
+			"attackerLoc": [31.23, 121.47],
+			"attackerLabel": "중국 (상하이 푸동)",
+			"c2Loc": [22.31, 114.17],
+			"c2Label": "홍콩 (C2 서버)",
+			"targetLoc": [38.9, -77.03],
+			"targetLabel": "미국 방산·IT·통신",
+			"operationType": "국방·방산 기밀 탈취",
+			"color": "#e05c5c",
+			"weight": 4,
+			"id": "G0006",
+			"mitreName": "APT1",
+			"aliases": [
+				"APT1",
+				"Comment Crew",
+				"Comment Group",
+				"Comment Panda"
+			],
+			"description": "[APT1](https://attack.mitre.org/groups/G0006) is a Chinese threat group that has been attributed to the 2nd Bureau of the People’s Liberation Army (PLA) General Staff Department’s (GSD) 3rd Department, commonly known by its Military Unit Cover Designator (MUCD) as Unit 61398. (Citation: Mandiant APT1)",
+			"mitreUrl": "https://attack.mitre.org/groups/G0006",
+			"version": "1.4",
+			"modified": "2025-04-25T14:49:20.672Z",
+			"techniques": [
+				{
+					"tactic": "collection",
+					"id": "T1005",
+					"name": "Data from Local System",
+					"url": "https://attack.mitre.org/techniques/T1005",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) has collected files from a local victim.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1114.001",
+					"name": "Local Email Collection",
+					"url": "https://attack.mitre.org/techniques/T1114/001",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) uses two utilities, GETMAIL and MAPIGET, to steal email. GETMAIL extracts emails from archived Outlook .pst files.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1114.002",
+					"name": "Remote Email Collection",
+					"url": "https://attack.mitre.org/techniques/T1114/002",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) uses two utilities, GETMAIL and MAPIGET, to steal email. MAPIGET steals email still on Exchange servers that has not yet been archived.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1119",
+					"name": "Automated Collection",
+					"url": "https://attack.mitre.org/techniques/T1119",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) used a batch script to perform a series of discovery techniques and saves it to a text file.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1560.001",
+					"name": "Archive via Utility",
+					"url": "https://attack.mitre.org/techniques/T1560/001",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) has used RAR to compress files before moving them outside of the victim network.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1003.001",
+					"name": "LSASS Memory",
+					"url": "https://attack.mitre.org/techniques/T1003/001",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) has been known to use credential dumping using [Mimikatz](https://attack.mitre.org/software/S0002).(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1007",
+					"name": "System Service Discovery",
+					"url": "https://attack.mitre.org/techniques/T1007",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) used the commands <code>net start</code> and <code>tasklist</code> to get a listing of the services on the system.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1016",
+					"name": "System Network Configuration Discovery",
+					"url": "https://attack.mitre.org/techniques/T1016",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) used the <code>ipconfig /all</code> command to gather network configuration information.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1049",
+					"name": "System Network Connections Discovery",
+					"url": "https://attack.mitre.org/techniques/T1049",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) used the <code>net use</code> command to get a listing on network connections.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1057",
+					"name": "Process Discovery",
+					"url": "https://attack.mitre.org/techniques/T1057",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) gathered a list of running processes on the system using <code>tasklist /v</code>.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1087.001",
+					"name": "Local Account",
+					"url": "https://attack.mitre.org/techniques/T1087/001",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) used the commands <code>net localgroup</code>,<code>net user</code>, and <code>net group</code> to find accounts on the system.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1135",
+					"name": "Network Share Discovery",
+					"url": "https://attack.mitre.org/techniques/T1135",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) listed connected network shares.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1059.003",
+					"name": "Windows Command Shell",
+					"url": "https://attack.mitre.org/techniques/T1059/003",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) has used the Windows command shell to execute commands, and batch scripting to automate execution.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1566.001",
+					"name": "Spearphishing Attachment",
+					"url": "https://attack.mitre.org/techniques/T1566/001",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) has sent spearphishing emails containing malicious attachments.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1566.002",
+					"name": "Spearphishing Link",
+					"url": "https://attack.mitre.org/techniques/T1566/002",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) has sent spearphishing emails containing hyperlinks to malicious files.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "lateral-movement",
+					"id": "T1021.001",
+					"name": "Remote Desktop Protocol",
+					"url": "https://attack.mitre.org/techniques/T1021/001",
+					"use": "The [APT1](https://attack.mitre.org/groups/G0006) group is known to have used RDP during operations.(Citation: FireEye PLA)"
+				},
+				{
+					"tactic": "lateral-movement",
+					"id": "T1550.002",
+					"name": "Pass the Hash",
+					"url": "https://attack.mitre.org/techniques/T1550/002",
+					"use": "The [APT1](https://attack.mitre.org/groups/G0006) group is known to have used pass the hash.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1583.001",
+					"name": "Domains",
+					"url": "https://attack.mitre.org/techniques/T1583/001",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) has registered hundreds of domains for use in operations.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1584.001",
+					"name": "Domains",
+					"url": "https://attack.mitre.org/techniques/T1584/001",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) hijacked FQDNs associated with legitimate websites hosted by hop points.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1585.002",
+					"name": "Email Accounts",
+					"url": "https://attack.mitre.org/techniques/T1585/002",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) has created email accounts for later use in social engineering, phishing, and when registering domains.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1588.001",
+					"name": "Malware",
+					"url": "https://attack.mitre.org/techniques/T1588/001",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) used publicly available malware for privilege escalation.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1588.002",
+					"name": "Tool",
+					"url": "https://attack.mitre.org/techniques/T1588/002",
+					"use": "[APT1](https://attack.mitre.org/groups/G0006) has used various open-source tools for privilege escalation purposes.(Citation: Mandiant APT1)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1036.005",
+					"name": "Match Legitimate Resource Name or Location",
+					"url": "https://attack.mitre.org/techniques/T1036/005",
+					"use": "The file name AcroRD32.exe, a legitimate process name for Adobe's Acrobat Reader, was used by [APT1](https://attack.mitre.org/groups/G0006) as a name for malware.(Citation: Mandiant APT1)(Citation: Mandiant APT1 Appendix)"
+				}
+			],
+			"software": [
+				{
+					"id": "S0345",
+					"name": "Seasalt",
+					"url": "https://attack.mitre.org/software/S0345"
+				},
+				{
+					"id": "S0100",
+					"name": "ipconfig",
+					"url": "https://attack.mitre.org/software/S0100"
+				},
+				{
+					"id": "S0017",
+					"name": "BISCUIT",
+					"url": "https://attack.mitre.org/software/S0017"
+				},
+				{
+					"id": "S0119",
+					"name": "Cachedump",
+					"url": "https://attack.mitre.org/software/S0119"
+				},
+				{
+					"id": "S0029",
+					"name": "PsExec",
+					"url": "https://attack.mitre.org/software/S0029"
+				},
+				{
+					"id": "S0026",
+					"name": "GLOOXMAIL",
+					"url": "https://attack.mitre.org/software/S0026"
+				},
+				{
+					"id": "S0121",
+					"name": "Lslsass",
+					"url": "https://attack.mitre.org/software/S0121"
+				},
+				{
+					"id": "S0012",
+					"name": "PoisonIvy",
+					"url": "https://attack.mitre.org/software/S0012"
+				}
+			],
+			"references": [{
+				"title": "Mandiant. (n.d.). APT1 Exposing One of China’s Cyber Espionage Units. Retrieved July 18, 2016.",
+				"url": "https://www.fireeye.com/content/dam/fireeye-www/services/pdfs/mandiant-apt1-report.pdf",
+				"source": "Mandiant APT1"
+			}, {
+				"title": "Crowdstrike Global Intelligence Team. (2014, June 9). CrowdStrike Intelligence Report: Putter Panda. Retrieved January 22, 2016.",
+				"url": "http://cdn0.vox-cdn.com/assets/4589853/crowdstrike-intelligence-report-putter-panda.original.pdf",
+				"source": "CrowdStrike Putter Panda"
+			}]
+		},
+		{
+			"key": "APT3",
+			"caseAlias": "UPS Team",
+			"attackerLoc": [30.57, 104.07],
+			"attackerLabel": "중국 (청두)",
+			"targetLoc": [37.77, -122.42],
+			"targetLabel": "미국 금융·IT",
+			"operationType": "금융·IT 지식재산 탈취",
+			"color": "#ef8354",
+			"weight": 4,
+			"id": "G0022",
+			"mitreName": "APT3",
+			"aliases": [
+				"APT3",
+				"Gothic Panda",
+				"Pirpi",
+				"UPS Team",
+				"Buckeye",
+				"Threat Group-0110",
+				"TG-0110"
+			],
+			"description": "[APT3](https://attack.mitre.org/groups/G0022) is a China-based threat group that researchers have attributed to China's Ministry of State Security.(Citation: FireEye Clandestine Wolf)(Citation: Recorded Future APT3 May 2017) This group is responsible for the campaigns known as Operation Clandestine Fox, Operation Clandestine Wolf, and Operation Double Tap.(Citation: FireEye Clandestine Wolf)(Citation: FireEye Operation Double Tap) As of June 2015, the group appears to have shifted from targeting primarily US victims to primarily political organizations in Hong Kong.(Citation: Symantec Buckeye)",
+			"mitreUrl": "https://attack.mitre.org/groups/G0022",
+			"version": "1.4",
+			"modified": "2026-01-20T15:46:53.916Z",
+			"techniques": [
+				{
+					"tactic": "collection",
+					"id": "T1005",
+					"name": "Data from Local System",
+					"url": "https://attack.mitre.org/techniques/T1005",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) will identify Microsoft Office documents on the victim's computer.(Citation: aptsim)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1056.001",
+					"name": "Keylogging",
+					"url": "https://attack.mitre.org/techniques/T1056/001",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has used a keylogging tool that records keystrokes in encrypted files.(Citation: Symantec Buckeye)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1074.001",
+					"name": "Local Data Staging",
+					"url": "https://attack.mitre.org/techniques/T1074/001",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has been known to stage files for exfiltration in a single location.(Citation: aptsim)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1560.001",
+					"name": "Archive via Utility",
+					"url": "https://attack.mitre.org/techniques/T1560/001",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has used tools to compress data before exfilling it.(Citation: aptsim)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1090.002",
+					"name": "External Proxy",
+					"url": "https://attack.mitre.org/techniques/T1090/002",
+					"use": "An [APT3](https://attack.mitre.org/groups/G0022) downloader establishes SOCKS5 connections for its initial C2.(Citation: FireEye Operation Double Tap)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1095",
+					"name": "Non-Application Layer Protocol",
+					"url": "https://attack.mitre.org/techniques/T1095",
+					"use": "An [APT3](https://attack.mitre.org/groups/G0022) downloader establishes SOCKS5 connections for its initial C2.(Citation: FireEye Operation Double Tap)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1104",
+					"name": "Multi-Stage Channels",
+					"url": "https://attack.mitre.org/techniques/T1104",
+					"use": "An [APT3](https://attack.mitre.org/groups/G0022) downloader first establishes a SOCKS5 connection to 192.157.198[.]103 using TCP port 1913; once the server response is verified, it then requests a connection to 192.184.60[.]229 on TCP port 81.(Citation: FireEye Operation Double Tap)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1105",
+					"name": "Ingress Tool Transfer",
+					"url": "https://attack.mitre.org/techniques/T1105",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has a tool that can copy files to remote machines.(Citation: FireEye Clandestine Fox)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1003.001",
+					"name": "LSASS Memory",
+					"url": "https://attack.mitre.org/techniques/T1003/001",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has used a tool to dump credentials by injecting itself into lsass.exe and triggering with the argument \"dig.\"(Citation: Symantec Buckeye)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1056.001",
+					"name": "Keylogging",
+					"url": "https://attack.mitre.org/techniques/T1056/001",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has used a keylogging tool that records keystrokes in encrypted files.(Citation: Symantec Buckeye)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1110.002",
+					"name": "Password Cracking",
+					"url": "https://attack.mitre.org/techniques/T1110/002",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has been known to brute force password hashes to be able to leverage plain text credentials.(Citation: APT3 Adversary Emulation Plan)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1552.001",
+					"name": "Credentials In Files",
+					"url": "https://attack.mitre.org/techniques/T1552/001",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has a tool that can locate credentials in files on the file system such as those from Firefox or Chrome.(Citation: Symantec Buckeye)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1555.003",
+					"name": "Credentials from Web Browsers",
+					"url": "https://attack.mitre.org/techniques/T1555/003",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has used tools to dump passwords from browsers.(Citation: Symantec Buckeye)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1016",
+					"name": "System Network Configuration Discovery",
+					"url": "https://attack.mitre.org/techniques/T1016",
+					"use": "A keylogging tool used by [APT3](https://attack.mitre.org/groups/G0022) gathers network information from the victim, including the MAC address, IP address, WINS, DHCP server, and gateway.(Citation: Symantec Buckeye)(Citation: evolution of pirpi)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1018",
+					"name": "Remote System Discovery",
+					"url": "https://attack.mitre.org/techniques/T1018",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has a tool that can detect the existence of remote systems.(Citation: Symantec Buckeye)(Citation: FireEye Clandestine Fox)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1033",
+					"name": "System Owner/User Discovery",
+					"url": "https://attack.mitre.org/techniques/T1033",
+					"use": "An [APT3](https://attack.mitre.org/groups/G0022) downloader uses the Windows command <code>\"cmd.exe\" /C whoami</code> to verify that it is running with the elevated privileges of “System.”(Citation: FireEye Operation Double Tap)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1049",
+					"name": "System Network Connections Discovery",
+					"url": "https://attack.mitre.org/techniques/T1049",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has a tool that can enumerate current network connections.(Citation: Symantec Buckeye)(Citation: FireEye Clandestine Fox)(Citation: evolution of pirpi)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1057",
+					"name": "Process Discovery",
+					"url": "https://attack.mitre.org/techniques/T1057",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has a tool that can list out currently running processes.(Citation: FireEye Clandestine Fox)(Citation: evolution of pirpi)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1069",
+					"name": "Permission Groups Discovery",
+					"url": "https://attack.mitre.org/techniques/T1069",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has a tool that can enumerate the permissions associated with Windows groups.(Citation: Symantec Buckeye)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1082",
+					"name": "System Information Discovery",
+					"url": "https://attack.mitre.org/techniques/T1082",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has a tool that can obtain information about the local system.(Citation: Symantec Buckeye)(Citation: evolution of pirpi)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1083",
+					"name": "File and Directory Discovery",
+					"url": "https://attack.mitre.org/techniques/T1083",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has a tool that looks for files and directories on the local file system.(Citation: FireEye Clandestine Fox)(Citation: evolution of pirpi)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1087.001",
+					"name": "Local Account",
+					"url": "https://attack.mitre.org/techniques/T1087/001",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has used a tool that can obtain info about local and global group users, power users, and administrators.(Citation: Symantec Buckeye)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1053.005",
+					"name": "Scheduled Task",
+					"url": "https://attack.mitre.org/techniques/T1053/005",
+					"use": "An [APT3](https://attack.mitre.org/groups/G0022) downloader creates persistence by creating the following scheduled task: <code>schtasks /create /tn \"mysc\" /tr C:\\Users\\Public\\test.exe /sc ONLOGON /ru \"System\"</code>.(Citation: FireEye Operation Double Tap)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1059.001",
+					"name": "PowerShell",
+					"url": "https://attack.mitre.org/techniques/T1059/001",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has used PowerShell on victim systems to download and run payloads after exploitation.(Citation: FireEye Operation Double Tap)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1059.003",
+					"name": "Windows Command Shell",
+					"url": "https://attack.mitre.org/techniques/T1059/003",
+					"use": "An [APT3](https://attack.mitre.org/groups/G0022) downloader uses the Windows command <code>\"cmd.exe\" /C whoami</code>. The group also uses a tool to execute commands on remote computers.(Citation: FireEye Operation Double Tap)(Citation: Symantec Buckeye)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1203",
+					"name": "Exploitation for Client Execution",
+					"url": "https://attack.mitre.org/techniques/T1203",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has exploited the Adobe Flash Player vulnerability CVE-2015-3113 and Internet Explorer vulnerability CVE-2014-1776.(Citation: FireEye Clandestine Wolf)(Citation: FireEye Clandestine Fox)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1204.001",
+					"name": "Malicious Link",
+					"url": "https://attack.mitre.org/techniques/T1204/001",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has lured victims into clicking malicious links delivered through spearphishing.(Citation: FireEye Clandestine Wolf)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1574.001",
+					"name": "DLL",
+					"url": "https://attack.mitre.org/techniques/T1574/001",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has been known to side load DLLs with a valid version of Chrome with one of their tools.(Citation: FireEye Clandestine Fox)(Citation: FireEye Clandestine Fox Part 2)"
+				},
+				{
+					"tactic": "exfiltration",
+					"id": "T1041",
+					"name": "Exfiltration Over C2 Channel",
+					"url": "https://attack.mitre.org/techniques/T1041",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has a tool that exfiltrates data over the C2 channel.(Citation: FireEye Clandestine Fox)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1078.002",
+					"name": "Domain Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078/002",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) leverages valid accounts after gaining credentials for use within the victim domain.(Citation: Symantec Buckeye)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1566.002",
+					"name": "Spearphishing Link",
+					"url": "https://attack.mitre.org/techniques/T1566/002",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has sent spearphishing emails containing malicious links.(Citation: FireEye Clandestine Wolf)"
+				},
+				{
+					"tactic": "lateral-movement",
+					"id": "T1021.001",
+					"name": "Remote Desktop Protocol",
+					"url": "https://attack.mitre.org/techniques/T1021/001",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) enables the Remote Desktop Protocol for persistence.(Citation: aptsim) [APT3](https://attack.mitre.org/groups/G0022) has also interacted with compromised systems to browse and copy files through RDP sessions.(Citation: Twitter Cglyer Status Update APT3 eml)"
+				},
+				{
+					"tactic": "lateral-movement",
+					"id": "T1021.002",
+					"name": "SMB/Windows Admin Shares",
+					"url": "https://attack.mitre.org/techniques/T1021/002",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) will copy files over to Windows Admin Shares (like ADMIN$) as part of lateral movement.(Citation: Symantec Buckeye)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1053.005",
+					"name": "Scheduled Task",
+					"url": "https://attack.mitre.org/techniques/T1053/005",
+					"use": "An [APT3](https://attack.mitre.org/groups/G0022) downloader creates persistence by creating the following scheduled task: <code>schtasks /create /tn \"mysc\" /tr C:\\Users\\Public\\test.exe /sc ONLOGON /ru \"System\"</code>.(Citation: FireEye Operation Double Tap)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1078.002",
+					"name": "Domain Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078/002",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) leverages valid accounts after gaining credentials for use within the victim domain.(Citation: Symantec Buckeye)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1098.007",
+					"name": "Additional Local or Domain Groups",
+					"url": "https://attack.mitre.org/techniques/T1098/007",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has been known to add created accounts to local admin groups to maintain elevated access.(Citation: aptsim)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1136.001",
+					"name": "Local Account",
+					"url": "https://attack.mitre.org/techniques/T1136/001",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has been known to create or enable accounts, such as <code>support_388945a0</code>.(Citation: aptsim)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1543.003",
+					"name": "Windows Service",
+					"url": "https://attack.mitre.org/techniques/T1543/003",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has a tool that creates a new service for persistence.(Citation: FireEye Operation Double Tap)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1546.008",
+					"name": "Accessibility Features",
+					"url": "https://attack.mitre.org/techniques/T1546/008",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) replaces the Sticky Keys binary <code>C:\\Windows\\System32\\sethc.exe</code> for persistence.(Citation: aptsim)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1547.001",
+					"name": "Registry Run Keys / Startup Folder",
+					"url": "https://attack.mitre.org/techniques/T1547/001",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) places scripts in the startup folder for persistence.(Citation: FireEye Operation Double Tap)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1053.005",
+					"name": "Scheduled Task",
+					"url": "https://attack.mitre.org/techniques/T1053/005",
+					"use": "An [APT3](https://attack.mitre.org/groups/G0022) downloader creates persistence by creating the following scheduled task: <code>schtasks /create /tn \"mysc\" /tr C:\\Users\\Public\\test.exe /sc ONLOGON /ru \"System\"</code>.(Citation: FireEye Operation Double Tap)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1078.002",
+					"name": "Domain Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078/002",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) leverages valid accounts after gaining credentials for use within the victim domain.(Citation: Symantec Buckeye)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1098.007",
+					"name": "Additional Local or Domain Groups",
+					"url": "https://attack.mitre.org/techniques/T1098/007",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has been known to add created accounts to local admin groups to maintain elevated access.(Citation: aptsim)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1543.003",
+					"name": "Windows Service",
+					"url": "https://attack.mitre.org/techniques/T1543/003",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has a tool that creates a new service for persistence.(Citation: FireEye Operation Double Tap)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1546.008",
+					"name": "Accessibility Features",
+					"url": "https://attack.mitre.org/techniques/T1546/008",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) replaces the Sticky Keys binary <code>C:\\Windows\\System32\\sethc.exe</code> for persistence.(Citation: aptsim)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1547.001",
+					"name": "Registry Run Keys / Startup Folder",
+					"url": "https://attack.mitre.org/techniques/T1547/001",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) places scripts in the startup folder for persistence.(Citation: FireEye Operation Double Tap)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1027",
+					"name": "Obfuscated Files or Information",
+					"url": "https://attack.mitre.org/techniques/T1027",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) obfuscates files or information to help evade defensive measures.(Citation: Symantec Buckeye)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1027.002",
+					"name": "Software Packing",
+					"url": "https://attack.mitre.org/techniques/T1027/002",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has been known to pack their tools.(Citation: APT3 Adversary Emulation Plan)(Citation: FireEye Clandestine Wolf)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1027.005",
+					"name": "Indicator Removal from Tools",
+					"url": "https://attack.mitre.org/techniques/T1027/005",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has been known to remove indicators of compromise from tools.(Citation: APT3 Adversary Emulation Plan)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1036.010",
+					"name": "Masquerade Account Name",
+					"url": "https://attack.mitre.org/techniques/T1036/010",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has been known to create or enable accounts, such as <code>support_388945a0</code>.(Citation: aptsim)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1070.004",
+					"name": "File Deletion",
+					"url": "https://attack.mitre.org/techniques/T1070/004",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has a tool that can delete files.(Citation: FireEye Clandestine Fox)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1078.002",
+					"name": "Domain Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078/002",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) leverages valid accounts after gaining credentials for use within the victim domain.(Citation: Symantec Buckeye)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1218.011",
+					"name": "Rundll32",
+					"url": "https://attack.mitre.org/techniques/T1218/011",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has a tool that can run DLLs.(Citation: FireEye Clandestine Fox)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1564.003",
+					"name": "Hidden Window",
+					"url": "https://attack.mitre.org/techniques/T1564/003",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has been known to use <code>-WindowStyle Hidden</code> to conceal [PowerShell](https://attack.mitre.org/techniques/T1059/001) windows.(Citation: FireEye Operation Double Tap)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1574.001",
+					"name": "DLL",
+					"url": "https://attack.mitre.org/techniques/T1574/001",
+					"use": "[APT3](https://attack.mitre.org/groups/G0022) has been known to side load DLLs with a valid version of Chrome with one of their tools.(Citation: FireEye Clandestine Fox)(Citation: FireEye Clandestine Fox Part 2)"
+				}
+			],
+			"software": [
+				{
+					"id": "S0165",
+					"name": "OSInfo",
+					"url": "https://attack.mitre.org/software/S0165"
+				},
+				{
+					"id": "S0111",
+					"name": "schtasks",
+					"url": "https://attack.mitre.org/software/S0111"
+				},
+				{
+					"id": "S0013",
+					"name": "PlugX",
+					"url": "https://attack.mitre.org/software/S0013"
+				},
+				{
+					"id": "S0349",
+					"name": "LaZagne",
+					"url": "https://attack.mitre.org/software/S0349"
+				},
+				{
+					"id": "S0063",
+					"name": "SHOTPUT",
+					"url": "https://attack.mitre.org/software/S0063"
+				},
+				{
+					"id": "S0166",
+					"name": "RemoteCMD",
+					"url": "https://attack.mitre.org/software/S0166"
+				}
+			],
+			"references": [
+				{
+					"title": "Eng, E., Caselden, D.. (2015, June 23). Operation Clandestine Wolf – Adobe Flash Zero-Day in APT3 Phishing Campaign. Retrieved January 14, 2016.",
+					"url": "https://www.fireeye.com/blog/threat-research/2015/06/operation-clandestine-wolf-adobe-flash-zero-day.html",
+					"source": "FireEye Clandestine Wolf"
+				},
+				{
+					"title": "Insikt Group (Recorded Future). (2017, May 17). Recorded Future Research Concludes Chinese Ministry of State Security Behind APT3. Retrieved September 16, 2024.",
+					"url": "https://www.recordedfuture.com/research/chinese-mss-behind-apt3",
+					"source": "Recorded Future APT3 May 2017"
+				},
+				{
+					"title": "Lancaster, T. (2015, July 25). A tale of Pirpi, Scanbox & CVE-2015-3113. Retrieved March 30, 2016.",
+					"url": "http://pwc.blogs.com/cyber_security_updates/2015/07/pirpi-scanbox.html",
+					"source": "PWC Pirpi Scanbox"
+				},
+				{
+					"title": "Moran, N., et al. (2014, November 21). Operation Double Tap. Retrieved January 14, 2016.",
+					"url": "https://www.fireeye.com/blog/threat-research/2014/11/operation_doubletap.html",
+					"source": "FireEye Operation Double Tap"
+				},
+				{
+					"title": "Symantec Security Response. (2016, September 6). Buckeye cyberespionage group shifts gaze from US to Hong Kong. Retrieved September 26, 2016.",
+					"url": "https://web.archive.org/web/20160910124439/http://www.symantec.com/connect/blogs/buckeye-cyberespionage-group-shifts-gaze-us-hong-kong",
+					"source": "Symantec Buckeye"
+				}
+			]
+		},
+		{
+			"key": "APT10",
+			"caseAlias": "Menupass / Stone Panda",
+			"attackerLoc": [39.9, 116.4],
+			"attackerLabel": "중국 (베이징)",
+			"c2Loc": [1.35, 103.82],
+			"c2Label": "싱가포르 (C2 서버)",
+			"targetLoc": [35.68, 139.69],
+			"targetLabel": "일본 건설·엔지니어링·통신",
+			"operationType": "Cloud Hopper — MSP 경유 정보 탈취",
+			"color": "#f0b45d",
+			"weight": 5,
+			"id": "G0045",
+			"mitreName": "menuPass",
+			"aliases": [
+				"menuPass",
+				"Cicada",
+				"POTASSIUM",
+				"Stone Panda",
+				"APT10",
+				"Red Apollo",
+				"CVNX",
+				"HOGFISH",
+				"BRONZE RIVERSIDE"
+			],
+			"description": "[menuPass](https://attack.mitre.org/groups/G0045) is a threat group that has been active since at least 2006. Individual members of [menuPass](https://attack.mitre.org/groups/G0045) are known to have acted in association with the Chinese Ministry of State Security's (MSS) Tianjin State Security Bureau and worked for the Huaying Haitai Science and Technology Development Company.(Citation: DOJ APT10 Dec 2018)(Citation: District Court of NY APT10 Indictment December 2018) [menuPass](https://attack.mitre.org/groups/G0045) has targeted healthcare, defense, aerospace, finance, maritime, biotechnology, energy, and government sectors globally, with an emphasis on Japanese organizations. In 2016 and 2017, the group is known to have targeted managed IT service providers (MSPs), manufacturing and mining companies, and a university.(Citation: Palo Alto menuPass Feb 2017)(Citation: Crowdstrike CrowdCast Oct 2013)(Citation: FireEye Poison Ivy)(Citation: PWC Cloud Hopper April 2017)(Citation: FireEye APT10 April 2017)(Citation: DOJ APT10 Dec 2018)(Citation: District Court of NY APT10 Indictment December 2018)",
+			"mitreUrl": "https://attack.mitre.org/groups/G0045",
+			"version": "3.0",
+			"modified": "2026-05-12T15:12:00.731Z",
+			"techniques": [
+				{
+					"tactic": "collection",
+					"id": "T1005",
+					"name": "Data from Local System",
+					"url": "https://attack.mitre.org/techniques/T1005",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has collected various files from the compromised computers.(Citation: DOJ APT10 Dec 2018)(Citation: Symantec Cicada November 2020)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1039",
+					"name": "Data from Network Shared Drive",
+					"url": "https://attack.mitre.org/techniques/T1039",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has collected data from remote systems by mounting network shares with <code>net use</code> and using Robocopy to transfer data.(Citation: PWC Cloud Hopper April 2017)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1056.001",
+					"name": "Keylogging",
+					"url": "https://attack.mitre.org/techniques/T1056/001",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used key loggers to steal usernames and passwords.(Citation: District Court of NY APT10 Indictment December 2018)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1074.001",
+					"name": "Local Data Staging",
+					"url": "https://attack.mitre.org/techniques/T1074/001",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) stages data prior to exfiltration in multi-part archives, often saved in the Recycle Bin.(Citation: PWC Cloud Hopper April 2017)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1074.002",
+					"name": "Remote Data Staging",
+					"url": "https://attack.mitre.org/techniques/T1074/002",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has staged data on remote MSP systems or other victim networks prior to exfiltration.(Citation: PWC Cloud Hopper April 2017)(Citation: Symantec Cicada November 2020)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1119",
+					"name": "Automated Collection",
+					"url": "https://attack.mitre.org/techniques/T1119",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used the Csvde tool to collect Active Directory files and data.(Citation: Symantec Cicada November 2020)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1560",
+					"name": "Archive Collected Data",
+					"url": "https://attack.mitre.org/techniques/T1560",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has encrypted files and information before exfiltration.(Citation: DOJ APT10 Dec 2018)(Citation: District Court of NY APT10 Indictment December 2018)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1560.001",
+					"name": "Archive via Utility",
+					"url": "https://attack.mitre.org/techniques/T1560/001",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has compressed files before exfiltration using TAR and RAR.(Citation: PWC Cloud Hopper April 2017)(Citation: PWC Cloud Hopper Technical Annex April 2017)(Citation: Symantec Cicada November 2020)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1090.002",
+					"name": "External Proxy",
+					"url": "https://attack.mitre.org/techniques/T1090/002",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used a global service provider's IP as a proxy for C2 traffic from a victim.(Citation: FireEye APT10 April 2017)(Citation: FireEye APT10 Sept 2018)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1105",
+					"name": "Ingress Tool Transfer",
+					"url": "https://attack.mitre.org/techniques/T1105",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has installed updates and new malware on victims.(Citation: PWC Cloud Hopper April 2017)(Citation: District Court of NY APT10 Indictment December 2018)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1568.001",
+					"name": "Fast Flux DNS",
+					"url": "https://attack.mitre.org/techniques/T1568/001",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used dynamic DNS service providers to host malicious domains.(Citation: District Court of NY APT10 Indictment December 2018)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1003.002",
+					"name": "Security Account Manager",
+					"url": "https://attack.mitre.org/techniques/T1003/002",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used a modified version of pentesting tools wmiexec.vbs and secretsdump.py to dump credentials.(Citation: PWC Cloud Hopper Technical Annex April 2017)(Citation: Github AD-Pentest-Script)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1003.003",
+					"name": "NTDS",
+					"url": "https://attack.mitre.org/techniques/T1003/003",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used Ntdsutil to dump credentials.(Citation: Symantec Cicada November 2020)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1003.004",
+					"name": "LSA Secrets",
+					"url": "https://attack.mitre.org/techniques/T1003/004",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used a modified version of pentesting tools wmiexec.vbs and secretsdump.py to dump credentials.(Citation: PWC Cloud Hopper Technical Annex April 2017)(Citation: Github AD-Pentest-Script)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1056.001",
+					"name": "Keylogging",
+					"url": "https://attack.mitre.org/techniques/T1056/001",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used key loggers to steal usernames and passwords.(Citation: District Court of NY APT10 Indictment December 2018)"
+				},
+				{
+					"tactic": "defense-impairment",
+					"id": "T1553.002",
+					"name": "Code Signing",
+					"url": "https://attack.mitre.org/techniques/T1553/002",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has resized and added data to the certificate table to enable the signing of modified files with legitimate signatures.(Citation: Securelist APT10 March 2021)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1016",
+					"name": "System Network Configuration Discovery",
+					"url": "https://attack.mitre.org/techniques/T1016",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used several tools to scan for open NetBIOS nameservers and enumerate NetBIOS sessions.(Citation: PWC Cloud Hopper Technical Annex April 2017)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1018",
+					"name": "Remote System Discovery",
+					"url": "https://attack.mitre.org/techniques/T1018",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) uses scripts to enumerate IP ranges on the victim network. [menuPass](https://attack.mitre.org/groups/G0045) has also issued the command <code>net view /domain</code> to a [PlugX](https://attack.mitre.org/software/S0013) implant to gather information about remote systems on the network.(Citation: PWC Cloud Hopper Technical Annex April 2017)(Citation: FireEye APT10 April 2017)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1046",
+					"name": "Network Service Discovery",
+					"url": "https://attack.mitre.org/techniques/T1046",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used tcping.exe, similar to [Ping](https://attack.mitre.org/software/S0097), to probe port status on systems of interest.(Citation: PWC Cloud Hopper Technical Annex April 2017)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1049",
+					"name": "System Network Connections Discovery",
+					"url": "https://attack.mitre.org/techniques/T1049",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used <code>net use</code> to conduct connectivity checks to machines.(Citation: PWC Cloud Hopper April 2017)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1083",
+					"name": "File and Directory Discovery",
+					"url": "https://attack.mitre.org/techniques/T1083",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has searched compromised systems for folders of interest including those related to HR, audit and expense, and meeting memos.(Citation: Symantec Cicada November 2020)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1087.002",
+					"name": "Domain Account",
+					"url": "https://attack.mitre.org/techniques/T1087/002",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used the Microsoft administration tool csvde.exe to export Active Directory data.(Citation: PWC Cloud Hopper Technical Annex April 2017)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1047",
+					"name": "Windows Management Instrumentation",
+					"url": "https://attack.mitre.org/techniques/T1047",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used a modified version of pentesting script wmiexec.vbs, which logs into a remote machine using WMI.(Citation: PWC Cloud Hopper Technical Annex April 2017)(Citation: Github AD-Pentest-Script)(Citation: Symantec Cicada November 2020)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1053.005",
+					"name": "Scheduled Task",
+					"url": "https://attack.mitre.org/techniques/T1053/005",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used a script (atexec.py) to execute a command on a target machine via Task Scheduler.(Citation: PWC Cloud Hopper Technical Annex April 2017)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1059.001",
+					"name": "PowerShell",
+					"url": "https://attack.mitre.org/techniques/T1059/001",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) uses [PowerSploit](https://attack.mitre.org/software/S0194) to inject shellcode into PowerShell.(Citation: PWC Cloud Hopper Technical Annex April 2017)(Citation: Symantec Cicada November 2020)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1059.003",
+					"name": "Windows Command Shell",
+					"url": "https://attack.mitre.org/techniques/T1059/003",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) executes commands using a command-line interface and reverse shell. The group has used a modified version of pentesting script wmiexec.vbs to execute commands.(Citation: PWC Cloud Hopper April 2017)(Citation: PWC Cloud Hopper Technical Annex April 2017)(Citation: Github AD-Pentest-Script)(Citation: FireEye APT10 Sept 2018) [menuPass](https://attack.mitre.org/groups/G0045) has used malicious macros embedded inside Office documents to execute files.(Citation: Accenture Hogfish April 2018)(Citation: FireEye APT10 Sept 2018)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1106",
+					"name": "Native API",
+					"url": "https://attack.mitre.org/techniques/T1106",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used native APIs including <code>GetModuleFileName</code>, <code>lstrcat</code>, <code>CreateFile</code>, and <code>ReadFile</code>.(Citation: Symantec Cicada November 2020)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1204.002",
+					"name": "Malicious File",
+					"url": "https://attack.mitre.org/techniques/T1204/002",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has attempted to get victims to open malicious files such as Windows Shortcuts (.lnk) and/or Microsoft Office documents, sent via email as part of spearphishing campaigns.(Citation: PWC Cloud Hopper Technical Annex April 2017)(Citation: FireEye APT10 April 2017)(Citation: Accenture Hogfish April 2018)(Citation: FireEye APT10 Sept 2018)(Citation: District Court of NY APT10 Indictment December 2018)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1574.001",
+					"name": "DLL",
+					"url": "https://attack.mitre.org/techniques/T1574/001",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used DLL side-loading to launch versions of Mimikatz and PwDump6 as well as [UPPERCUT](https://attack.mitre.org/software/S0275).(Citation: PWC Cloud Hopper Technical Annex April 2017)(Citation: FireEye APT10 Sept 2018)(Citation: Symantec Cicada November 2020) [menuPass](https://attack.mitre.org/groups/G0045) has also used DLL search order hijacking.(Citation: PWC Cloud Hopper April 2017)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used valid accounts including shared between Managed Service Providers and clients to move between the two environments.(Citation: PWC Cloud Hopper April 2017)(Citation: Symantec Cicada November 2020)(Citation: District Court of NY APT10 Indictment December 2018)(Citation: Securelist APT10 March 2021)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1190",
+					"name": "Exploit Public-Facing Application",
+					"url": "https://attack.mitre.org/techniques/T1190",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has leveraged vulnerabilities in Pulse Secure VPNs to hijack sessions.(Citation: Securelist APT10 March 2021)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1199",
+					"name": "Trusted Relationship",
+					"url": "https://attack.mitre.org/techniques/T1199",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used legitimate access granted to Managed Service Providers in order to access victims of interest.(Citation: PWC Cloud Hopper Technical Annex April 2017)(Citation: FireEye APT10 April 2017)(Citation: Symantec Cicada November 2020)(Citation: DOJ APT10 Dec 2018)(Citation: District Court of NY APT10 Indictment December 2018)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1566.001",
+					"name": "Spearphishing Attachment",
+					"url": "https://attack.mitre.org/techniques/T1566/001",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has sent malicious Office documents via email as part of spearphishing campaigns as well as executables disguised as documents.(Citation: PWC Cloud Hopper Technical Annex April 2017)(Citation: FireEye APT10 April 2017)(Citation: FireEye APT10 Sept 2018)(Citation: District Court of NY APT10 Indictment December 2018)"
+				},
+				{
+					"tactic": "lateral-movement",
+					"id": "T1021.001",
+					"name": "Remote Desktop Protocol",
+					"url": "https://attack.mitre.org/techniques/T1021/001",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used RDP connections to move across the victim network.(Citation: PWC Cloud Hopper April 2017)(Citation: District Court of NY APT10 Indictment December 2018)"
+				},
+				{
+					"tactic": "lateral-movement",
+					"id": "T1021.004",
+					"name": "SSH",
+					"url": "https://attack.mitre.org/techniques/T1021/004",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used Putty Secure Copy Client (PSCP) to transfer data.(Citation: PWC Cloud Hopper April 2017)"
+				},
+				{
+					"tactic": "lateral-movement",
+					"id": "T1210",
+					"name": "Exploitation of Remote Services",
+					"url": "https://attack.mitre.org/techniques/T1210",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used tools to exploit the ZeroLogon vulnerability (CVE-2020-1472).(Citation: Symantec Cicada November 2020)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1053.005",
+					"name": "Scheduled Task",
+					"url": "https://attack.mitre.org/techniques/T1053/005",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used a script (atexec.py) to execute a command on a target machine via Task Scheduler.(Citation: PWC Cloud Hopper Technical Annex April 2017)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used valid accounts including shared between Managed Service Providers and clients to move between the two environments.(Citation: PWC Cloud Hopper April 2017)(Citation: Symantec Cicada November 2020)(Citation: District Court of NY APT10 Indictment December 2018)(Citation: Securelist APT10 March 2021)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1053.005",
+					"name": "Scheduled Task",
+					"url": "https://attack.mitre.org/techniques/T1053/005",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used a script (atexec.py) to execute a command on a target machine via Task Scheduler.(Citation: PWC Cloud Hopper Technical Annex April 2017)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1055.012",
+					"name": "Process Hollowing",
+					"url": "https://attack.mitre.org/techniques/T1055/012",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used process hollowing in iexplore.exe to load the [RedLeaves](https://attack.mitre.org/software/S0153) implant.(Citation: Accenture Hogfish April 2018)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used valid accounts including shared between Managed Service Providers and clients to move between the two environments.(Citation: PWC Cloud Hopper April 2017)(Citation: Symantec Cicada November 2020)(Citation: District Court of NY APT10 Indictment December 2018)(Citation: Securelist APT10 March 2021)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1583.001",
+					"name": "Domains",
+					"url": "https://attack.mitre.org/techniques/T1583/001",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has registered malicious domains for use in intrusion campaigns.(Citation: DOJ APT10 Dec 2018)(Citation: District Court of NY APT10 Indictment December 2018)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1588.002",
+					"name": "Tool",
+					"url": "https://attack.mitre.org/techniques/T1588/002",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used and modified open-source tools like [Impacket](https://attack.mitre.org/software/S0357), [Mimikatz](https://attack.mitre.org/software/S0002), and [pwdump](https://attack.mitre.org/software/S0006).(Citation: PWC Cloud Hopper Technical Annex April 2017)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1027.013",
+					"name": "Encrypted/Encoded File",
+					"url": "https://attack.mitre.org/techniques/T1027/013",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has encoded strings in its malware with base64 as well as with a simple, single-byte XOR obfuscation using key 0x40.(Citation: Accenture Hogfish April 2018)(Citation: FireEye APT10 Sept 2018)(Citation: Symantec Cicada November 2020)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1036",
+					"name": "Masquerading",
+					"url": "https://attack.mitre.org/techniques/T1036",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used [esentutl](https://attack.mitre.org/software/S0404) to change file extensions to their true type that were masquerading as .txt files.(Citation: FireEye APT10 Sept 2018)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1036.003",
+					"name": "Rename Legitimate Utilities",
+					"url": "https://attack.mitre.org/techniques/T1036/003",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has renamed [certutil](https://attack.mitre.org/software/S0160) and moved it to a different location on the system to avoid detection based on use of the tool.(Citation: FireEye APT10 Sept 2018)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1036.005",
+					"name": "Match Legitimate Resource Name or Location",
+					"url": "https://attack.mitre.org/techniques/T1036/005",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has been seen changing malicious files to appear legitimate.(Citation: District Court of NY APT10 Indictment December 2018)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1055.012",
+					"name": "Process Hollowing",
+					"url": "https://attack.mitre.org/techniques/T1055/012",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used process hollowing in iexplore.exe to load the [RedLeaves](https://attack.mitre.org/software/S0153) implant.(Citation: Accenture Hogfish April 2018)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1070.003",
+					"name": "Clear Command History",
+					"url": "https://attack.mitre.org/techniques/T1070/003",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used [Wevtutil](https://attack.mitre.org/software/S0645) to remove PowerShell execution logs.(Citation: Securelist APT10 March 2021)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1070.004",
+					"name": "File Deletion",
+					"url": "https://attack.mitre.org/techniques/T1070/004",
+					"use": "A [menuPass](https://attack.mitre.org/groups/G0045) macro deletes files after it has decoded and decompressed them.(Citation: Accenture Hogfish April 2018)(Citation: District Court of NY APT10 Indictment December 2018)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used valid accounts including shared between Managed Service Providers and clients to move between the two environments.(Citation: PWC Cloud Hopper April 2017)(Citation: Symantec Cicada November 2020)(Citation: District Court of NY APT10 Indictment December 2018)(Citation: Securelist APT10 March 2021)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1140",
+					"name": "Deobfuscate/Decode Files or Information",
+					"url": "https://attack.mitre.org/techniques/T1140",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used [certutil](https://attack.mitre.org/software/S0160) in a macro to decode base64-encoded content contained in a dropper document attached to an email. The group has also used <code>certutil -decode</code> to decode files on the victim’s machine when dropping [UPPERCUT](https://attack.mitre.org/software/S0275).(Citation: Accenture Hogfish April 2018)(Citation: FireEye APT10 Sept 2018)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1218.004",
+					"name": "InstallUtil",
+					"url": "https://attack.mitre.org/techniques/T1218/004",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used <code>InstallUtil.exe</code> to execute malicious software.(Citation: PWC Cloud Hopper Technical Annex April 2017)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1574.001",
+					"name": "DLL",
+					"url": "https://attack.mitre.org/techniques/T1574/001",
+					"use": "[menuPass](https://attack.mitre.org/groups/G0045) has used DLL side-loading to launch versions of Mimikatz and PwDump6 as well as [UPPERCUT](https://attack.mitre.org/software/S0275).(Citation: PWC Cloud Hopper Technical Annex April 2017)(Citation: FireEye APT10 Sept 2018)(Citation: Symantec Cicada November 2020) [menuPass](https://attack.mitre.org/groups/G0045) has also used DLL search order hijacking.(Citation: PWC Cloud Hopper April 2017)"
+				}
+			],
+			"software": [
+				{
+					"id": "S0160",
+					"name": "certutil",
+					"url": "https://attack.mitre.org/software/S0160"
+				},
+				{
+					"id": "S0628",
+					"name": "FYAnti",
+					"url": "https://attack.mitre.org/software/S0628"
+				},
+				{
+					"id": "S0275",
+					"name": "UPPERCUT",
+					"url": "https://attack.mitre.org/software/S0275"
+				},
+				{
+					"id": "S0159",
+					"name": "SNUGRIDE",
+					"url": "https://attack.mitre.org/software/S0159"
+				},
+				{
+					"id": "S0626",
+					"name": "P8RAT",
+					"url": "https://attack.mitre.org/software/S0626"
+				},
+				{
+					"id": "S0153",
+					"name": "RedLeaves",
+					"url": "https://attack.mitre.org/software/S0153"
+				},
+				{
+					"id": "S0627",
+					"name": "SodaMaster",
+					"url": "https://attack.mitre.org/software/S0627"
+				},
+				{
+					"id": "S0006",
+					"name": "pwdump",
+					"url": "https://attack.mitre.org/software/S0006"
+				}
+			],
+			"references": [
+				{
+					"title": "Accenture Security. (2018, April 23). Hogfish Redleaves Campaign. Retrieved July 2, 2018.",
+					"url": "http://web.archive.org/web/20220810112638/https:/www.accenture.com/t20180423T055005Z_w_/se-en/_acnmedia/PDF-76/Accenture-Hogfish-Threat-Analysis.pdf",
+					"source": "Accenture Hogfish April 2018"
+				},
+				{
+					"title": "Counter Threat Unit Research Team . (2022, June 23). BRONZE STARLIGHT RANSOMWARE OPERATIONS USE HUI LOADER. Retrieved December 7, 2023.",
+					"url": "https://www.secureworks.com/research/bronze-starlight-ransomware-operations-use-hui-loader",
+					"source": "SecureWorks BRONZE STARLIGHT Ransomware Operations June 2022"
+				},
+				{
+					"title": "Crowdstrike. (2013, October 16). CrowdCasts Monthly: You Have an Adversary Problem. Retrieved November 17, 2024.",
+					"url": "https://www.slideshare.net/slideshow/crowd-casts-monthly-you-have-an-adversary-problem/27262315",
+					"source": "Crowdstrike CrowdCast Oct 2013"
+				},
+				{
+					"title": "FireEye iSIGHT Intelligence. (2017, April 6). APT10 (MenuPass Group): New Tools, Global Campaign Latest Manifestation of Longstanding Threat. Retrieved June 29, 2017.",
+					"url": "https://www.fireeye.com/blog/threat-research/2017/04/apt10_menupass_grou.html",
+					"source": "FireEye APT10 April 2017"
+				},
+				{
+					"title": "FireEye. (2014). POISON IVY: Assessing Damage and Extracting Intelligence. Retrieved September 19, 2024.",
+					"url": "https://www.mandiant.com/sites/default/files/2021-09/rpt-poison-ivy.pdf",
+					"source": "FireEye Poison Ivy"
+				}
+			]
+		},
+		{
+			"key": "APT27",
+			"caseAlias": "Emissary Panda",
+			"attackerLoc": [39.9, 116.4],
+			"attackerLabel": "중국 (베이징)",
+			"targetLoc": [52.52, 13.4],
+			"targetLabel": "독일 정부·에너지·방산",
+			"operationType": "국방·항공우주 지식재산 탈취",
+			"color": "#f3ce5b",
+			"weight": 4,
+			"id": "G0027",
+			"mitreName": "Threat Group-3390",
+			"aliases": [
+				"Threat Group-3390",
+				"Earth Smilodon",
+				"TG-3390",
+				"Emissary Panda",
+				"BRONZE UNION",
+				"APT27",
+				"Iron Tiger",
+				"LuckyMouse",
+				"Linen Typhoon"
+			],
+			"description": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) is a Chinese threat group that has extensively used strategic Web compromises to target victims.(Citation: Dell TG-3390) The group has been active since at least 2010 and has targeted organizations in the aerospace, government, defense, technology, energy, manufacturing and gambling/betting sectors.(Citation: SecureWorks BRONZE UNION June 2017)(Citation: Securelist LuckyMouse June 2018)(Citation: Trend Micro DRBControl February 2020)",
+			"mitreUrl": "https://attack.mitre.org/groups/G0027",
+			"version": "3.0",
+			"modified": "2025-10-15T20:24:59.798Z",
+			"techniques": [
+				{
+					"tactic": "collection",
+					"id": "T1005",
+					"name": "Data from Local System",
+					"url": "https://attack.mitre.org/techniques/T1005",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) ran a command to compile an archive of file types of interest from the victim user's directories.(Citation: SecureWorks BRONZE UNION June 2017)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1056.001",
+					"name": "Keylogging",
+					"url": "https://attack.mitre.org/techniques/T1056/001",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) actors installed a credential logger on Microsoft Exchange servers. [Threat Group-3390](https://attack.mitre.org/groups/G0027) also leveraged the reconnaissance framework, ScanBox, to capture keystrokes.(Citation: Dell TG-3390)(Citation: Hacker News LuckyMouse June 2018)(Citation: Securelist LuckyMouse June 2018)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1074.001",
+					"name": "Local Data Staging",
+					"url": "https://attack.mitre.org/techniques/T1074/001",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has locally staged encrypted archives for later exfiltration efforts.(Citation: SecureWorks BRONZE UNION June 2017)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1074.002",
+					"name": "Remote Data Staging",
+					"url": "https://attack.mitre.org/techniques/T1074/002",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has moved staged encrypted archives to Internet-facing servers that had previously been compromised with [China Chopper](https://attack.mitre.org/software/S0020) prior to exfiltration.(Citation: SecureWorks BRONZE UNION June 2017)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1119",
+					"name": "Automated Collection",
+					"url": "https://attack.mitre.org/techniques/T1119",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) ran a command to compile an archive of file types of interest from the victim user's directories.(Citation: SecureWorks BRONZE UNION June 2017)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1560.002",
+					"name": "Archive via Library",
+					"url": "https://attack.mitre.org/techniques/T1560/002",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has used RAR to compress, encrypt, and password-protect files prior to exfiltration.(Citation: SecureWorks BRONZE UNION June 2017)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1071.001",
+					"name": "Web Protocols",
+					"url": "https://attack.mitre.org/techniques/T1071/001",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) malware has used HTTP for C2.(Citation: Securelist LuckyMouse June 2018)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1105",
+					"name": "Ingress Tool Transfer",
+					"url": "https://attack.mitre.org/techniques/T1105",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has downloaded additional malware and tools, including through the use of `certutil`, onto a compromised host .(Citation: Dell TG-3390)(Citation: Trend Micro DRBControl February 2020)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1003.001",
+					"name": "LSASS Memory",
+					"url": "https://attack.mitre.org/techniques/T1003/001",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) actors have used a modified version of [Mimikatz](https://attack.mitre.org/software/S0002) called Wrapikatz to dump credentials. They have also dumped credentials from domain controllers.(Citation: Dell TG-3390)(Citation: SecureWorks BRONZE UNION June 2017)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1003.002",
+					"name": "Security Account Manager",
+					"url": "https://attack.mitre.org/techniques/T1003/002",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) actors have used [gsecdump](https://attack.mitre.org/software/S0008) to dump credentials. They have also dumped credentials from domain controllers.(Citation: Dell TG-3390)(Citation: SecureWorks BRONZE UNION June 2017)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1003.004",
+					"name": "LSA Secrets",
+					"url": "https://attack.mitre.org/techniques/T1003/004",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) actors have used [gsecdump](https://attack.mitre.org/software/S0008) to dump credentials. They have also dumped credentials from domain controllers.(Citation: Dell TG-3390)(Citation: SecureWorks BRONZE UNION June 2017)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1056.001",
+					"name": "Keylogging",
+					"url": "https://attack.mitre.org/techniques/T1056/001",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) actors installed a credential logger on Microsoft Exchange servers. [Threat Group-3390](https://attack.mitre.org/groups/G0027) also leveraged the reconnaissance framework, ScanBox, to capture keystrokes.(Citation: Dell TG-3390)(Citation: Hacker News LuckyMouse June 2018)(Citation: Securelist LuckyMouse June 2018)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1555.005",
+					"name": "Password Managers",
+					"url": "https://attack.mitre.org/techniques/T1555/005",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) obtained a KeePass database from a compromised host.(Citation: Trend Micro DRBControl February 2020)"
+				},
+				{
+					"tactic": "defense-impairment",
+					"id": "T1112",
+					"name": "Modify Registry",
+					"url": "https://attack.mitre.org/techniques/T1112",
+					"use": "A [Threat Group-3390](https://attack.mitre.org/groups/G0027) tool has created new Registry keys under `HKEY_CURRENT_USER\\Software\\Classes\\` and `HKLM\\SYSTEM\\CurrentControlSet\\services`.(Citation: Nccgroup Emissary Panda May 2018)(Citation: Trend Micro Iron Tiger April 2021)"
+				},
+				{
+					"tactic": "defense-impairment",
+					"id": "T1685.001",
+					"name": "Disable or Modify Windows Event Log",
+					"url": "https://attack.mitre.org/techniques/T1685/001",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has used appcmd.exe to disable logging on a victim server.(Citation: SecureWorks BRONZE UNION June 2017)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1012",
+					"name": "Query Registry",
+					"url": "https://attack.mitre.org/techniques/T1012",
+					"use": "A [Threat Group-3390](https://attack.mitre.org/groups/G0027) tool can read and decrypt stored Registry values.(Citation: Nccgroup Emissary Panda May 2018)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1016",
+					"name": "System Network Configuration Discovery",
+					"url": "https://attack.mitre.org/techniques/T1016",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) actors use [NBTscan](https://attack.mitre.org/software/S0590) to discover vulnerable systems.(Citation: Dell TG-3390)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1018",
+					"name": "Remote System Discovery",
+					"url": "https://attack.mitre.org/techniques/T1018",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has used the <code>net view</code> command.(Citation: Nccgroup Emissary Panda May 2018)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1033",
+					"name": "System Owner/User Discovery",
+					"url": "https://attack.mitre.org/techniques/T1033",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has used `whoami` to collect system user information.(Citation: Trend Micro DRBControl February 2020)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1046",
+					"name": "Network Service Discovery",
+					"url": "https://attack.mitre.org/techniques/T1046",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) actors use the Hunter tool to conduct network service discovery for vulnerable systems.(Citation: Dell TG-3390)(Citation: Unit42 Emissary Panda May 2019)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1049",
+					"name": "System Network Connections Discovery",
+					"url": "https://attack.mitre.org/techniques/T1049",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has used `net use` and `netstat` to conduct internal discovery of systems. The group has also used `quser.exe` to identify existing RDP sessions on a victim.(Citation: SecureWorks BRONZE UNION June 2017)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1087.001",
+					"name": "Local Account",
+					"url": "https://attack.mitre.org/techniques/T1087/001",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has used <code>net user</code> to conduct internal discovery of systems.(Citation: SecureWorks BRONZE UNION June 2017)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1047",
+					"name": "Windows Management Instrumentation",
+					"url": "https://attack.mitre.org/techniques/T1047",
+					"use": "A [Threat Group-3390](https://attack.mitre.org/groups/G0027) tool can use WMI to execute a binary.(Citation: Nccgroup Emissary Panda May 2018)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1053.002",
+					"name": "At",
+					"url": "https://attack.mitre.org/techniques/T1053/002",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) actors use [at](https://attack.mitre.org/software/S0110) to schedule tasks to run self-extracting RAR archives, which install [HTTPBrowser](https://attack.mitre.org/software/S0070) or [PlugX](https://attack.mitre.org/software/S0013) on other victims on a network.(Citation: Dell TG-3390)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1059.001",
+					"name": "PowerShell",
+					"url": "https://attack.mitre.org/techniques/T1059/001",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has used PowerShell for execution.(Citation: SecureWorks BRONZE UNION June 2017)(Citation: Trend Micro DRBControl February 2020)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1059.003",
+					"name": "Windows Command Shell",
+					"url": "https://attack.mitre.org/techniques/T1059/003",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has used command-line interfaces for execution.(Citation: SecureWorks BRONZE UNION June 2017)(Citation: Unit42 Emissary Panda May 2019)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1203",
+					"name": "Exploitation for Client Execution",
+					"url": "https://attack.mitre.org/techniques/T1203",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has exploited CVE-2018-0798 in Equation Editor.(Citation: Trend Micro Iron Tiger April 2021)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1204.002",
+					"name": "Malicious File",
+					"url": "https://attack.mitre.org/techniques/T1204/002",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has lured victims into opening malicious files containing malware.(Citation: Trend Micro DRBControl February 2020)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1574.001",
+					"name": "DLL",
+					"url": "https://attack.mitre.org/techniques/T1574/001",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has performed DLL search order hijacking to execute their payload.(Citation: Nccgroup Emissary Panda May 2018) [Threat Group-3390](https://attack.mitre.org/groups/G0027) has also used DLL side-loading, including by using legitimate Kaspersky antivirus variants as well as `rc.exe`, a legitimate Microsoft Resource Compiler.(Citation: Dell TG-3390)(Citation: SecureWorks BRONZE UNION June 2017)(Citation: Securelist LuckyMouse June 2018)(Citation: Unit42 Emissary Panda May 2019)(Citation: Lunghi Iron Tiger Linux)"
+				},
+				{
+					"tactic": "exfiltration",
+					"id": "T1030",
+					"name": "Data Transfer Size Limits",
+					"url": "https://attack.mitre.org/techniques/T1030",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) actors have split RAR files for exfiltration into parts.(Citation: Dell TG-3390)"
+				},
+				{
+					"tactic": "exfiltration",
+					"id": "T1567.002",
+					"name": "Exfiltration to Cloud Storage",
+					"url": "https://attack.mitre.org/techniques/T1567/002",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has exfiltrated stolen data to Dropbox.(Citation: Trend Micro DRBControl February 2020)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) actors obtain legitimate credentials using a variety of methods and use them to further lateral movement on victim networks.(Citation: Dell TG-3390)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1133",
+					"name": "External Remote Services",
+					"url": "https://attack.mitre.org/techniques/T1133",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) actors look for and use VPN profiles during an operation to access the network using external VPN services.(Citation: Dell TG-3390) [Threat Group-3390](https://attack.mitre.org/groups/G0027) has also obtained OWA account credentials during intrusions that it subsequently used to attempt to regain access when evicted from a victim network.(Citation: SecureWorks BRONZE UNION June 2017)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1189",
+					"name": "Drive-by Compromise",
+					"url": "https://attack.mitre.org/techniques/T1189",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has extensively used strategic web compromises to target victims.(Citation: Dell TG-3390)(Citation: Securelist LuckyMouse June 2018)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1190",
+					"name": "Exploit Public-Facing Application",
+					"url": "https://attack.mitre.org/techniques/T1190",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has exploited the Microsoft SharePoint vulnerability CVE-2019-0604 and CVE-2021-26855, CVE-2021-26857, CVE-2021-26858, and CVE-2021-27065 in Exchange Server.(Citation: Trend Micro Iron Tiger April 2021)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1195.002",
+					"name": "Compromise Software Supply Chain",
+					"url": "https://attack.mitre.org/techniques/T1195/002",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has compromised the Able Desktop installer to gain access to victim's environments.(Citation: Trend Micro Iron Tiger April 2021)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1199",
+					"name": "Trusted Relationship",
+					"url": "https://attack.mitre.org/techniques/T1199",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has compromised third party service providers to gain access to victim's environments.(Citation: Profero APT27 December 2020)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1566.001",
+					"name": "Spearphishing Attachment",
+					"url": "https://attack.mitre.org/techniques/T1566/001",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has used e-mail to deliver malicious attachments to victims.(Citation: Trend Micro DRBControl February 2020)"
+				},
+				{
+					"tactic": "lateral-movement",
+					"id": "T1021.006",
+					"name": "Windows Remote Management",
+					"url": "https://attack.mitre.org/techniques/T1021/006",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has used WinRM to enable remote execution.(Citation: SecureWorks BRONZE UNION June 2017)"
+				},
+				{
+					"tactic": "lateral-movement",
+					"id": "T1210",
+					"name": "Exploitation of Remote Services",
+					"url": "https://attack.mitre.org/techniques/T1210",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has exploited MS17-010 to move laterally to other systems on the network.(Citation: Unit42 Emissary Panda May 2019)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1053.002",
+					"name": "At",
+					"url": "https://attack.mitre.org/techniques/T1053/002",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) actors use [at](https://attack.mitre.org/software/S0110) to schedule tasks to run self-extracting RAR archives, which install [HTTPBrowser](https://attack.mitre.org/software/S0070) or [PlugX](https://attack.mitre.org/software/S0013) on other victims on a network.(Citation: Dell TG-3390)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) actors obtain legitimate credentials using a variety of methods and use them to further lateral movement on victim networks.(Citation: Dell TG-3390)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1112",
+					"name": "Modify Registry",
+					"url": "https://attack.mitre.org/techniques/T1112",
+					"use": "A [Threat Group-3390](https://attack.mitre.org/groups/G0027) tool has created new Registry keys under `HKEY_CURRENT_USER\\Software\\Classes\\` and `HKLM\\SYSTEM\\CurrentControlSet\\services`.(Citation: Nccgroup Emissary Panda May 2018)(Citation: Trend Micro Iron Tiger April 2021)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1133",
+					"name": "External Remote Services",
+					"url": "https://attack.mitre.org/techniques/T1133",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) actors look for and use VPN profiles during an operation to access the network using external VPN services.(Citation: Dell TG-3390) [Threat Group-3390](https://attack.mitre.org/groups/G0027) has also obtained OWA account credentials during intrusions that it subsequently used to attempt to regain access when evicted from a victim network.(Citation: SecureWorks BRONZE UNION June 2017)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1505.003",
+					"name": "Web Shell",
+					"url": "https://attack.mitre.org/techniques/T1505/003",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has used a variety of Web shells.(Citation: Unit42 Emissary Panda May 2019)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1543.003",
+					"name": "Windows Service",
+					"url": "https://attack.mitre.org/techniques/T1543/003",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027)'s malware can create a new service, sometimes naming it after the config information, to gain persistence.(Citation: Nccgroup Emissary Panda May 2018)(Citation: Lunghi Iron Tiger Linux)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1547.001",
+					"name": "Registry Run Keys / Startup Folder",
+					"url": "https://attack.mitre.org/techniques/T1547/001",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027)'s malware can add a Registry key to `Software\\Microsoft\\Windows\\CurrentVersion\\Run` for persistence.(Citation: Nccgroup Emissary Panda May 2018)(Citation: Lunghi Iron Tiger Linux)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1053.002",
+					"name": "At",
+					"url": "https://attack.mitre.org/techniques/T1053/002",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) actors use [at](https://attack.mitre.org/software/S0110) to schedule tasks to run self-extracting RAR archives, which install [HTTPBrowser](https://attack.mitre.org/software/S0070) or [PlugX](https://attack.mitre.org/software/S0013) on other victims on a network.(Citation: Dell TG-3390)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1055.012",
+					"name": "Process Hollowing",
+					"url": "https://attack.mitre.org/techniques/T1055/012",
+					"use": "A [Threat Group-3390](https://attack.mitre.org/groups/G0027) tool can spawn `svchost.exe` and inject the payload into that process.(Citation: Nccgroup Emissary Panda May 2018)(Citation: Securelist LuckyMouse June 2018)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1068",
+					"name": "Exploitation for Privilege Escalation",
+					"url": "https://attack.mitre.org/techniques/T1068",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has used CVE-2014-6324 and CVE-2017-0213 to escalate privileges.(Citation: SecureWorks BRONZE UNION June 2017)(Citation: Profero APT27 December 2020)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) actors obtain legitimate credentials using a variety of methods and use them to further lateral movement on victim networks.(Citation: Dell TG-3390)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1543.003",
+					"name": "Windows Service",
+					"url": "https://attack.mitre.org/techniques/T1543/003",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027)'s malware can create a new service, sometimes naming it after the config information, to gain persistence.(Citation: Nccgroup Emissary Panda May 2018)(Citation: Lunghi Iron Tiger Linux)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1547.001",
+					"name": "Registry Run Keys / Startup Folder",
+					"url": "https://attack.mitre.org/techniques/T1547/001",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027)'s malware can add a Registry key to `Software\\Microsoft\\Windows\\CurrentVersion\\Run` for persistence.(Citation: Nccgroup Emissary Panda May 2018)(Citation: Lunghi Iron Tiger Linux)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1548.002",
+					"name": "Bypass User Account Control",
+					"url": "https://attack.mitre.org/techniques/T1548/002",
+					"use": "A [Threat Group-3390](https://attack.mitre.org/groups/G0027) tool can use a public UAC bypass method to elevate privileges.(Citation: Nccgroup Emissary Panda May 2018)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1583.001",
+					"name": "Domains",
+					"url": "https://attack.mitre.org/techniques/T1583/001",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has registered domains for C2.(Citation: Lunghi Iron Tiger Linux)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1588.002",
+					"name": "Tool",
+					"url": "https://attack.mitre.org/techniques/T1588/002",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has obtained and used tools such as [Impacket](https://attack.mitre.org/software/S0357), [pwdump](https://attack.mitre.org/software/S0006), [Mimikatz](https://attack.mitre.org/software/S0002), [gsecdump](https://attack.mitre.org/software/S0008), [NBTscan](https://attack.mitre.org/software/S0590), and [Windows Credential Editor](https://attack.mitre.org/software/S0005).(Citation: Unit42 Emissary Panda May 2019)(Citation: Dell TG-3390)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1588.003",
+					"name": "Code Signing Certificates",
+					"url": "https://attack.mitre.org/techniques/T1588/003",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has obtained stolen valid certificates, including from VMProtect and the Chinese instant messaging application Youdu, for their operations.(Citation: Lunghi Iron Tiger Linux)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1608.001",
+					"name": "Upload Malware",
+					"url": "https://attack.mitre.org/techniques/T1608/001",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has hosted malicious payloads on Dropbox.(Citation: Trend Micro DRBControl February 2020)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1608.002",
+					"name": "Upload Tool",
+					"url": "https://attack.mitre.org/techniques/T1608/002",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has staged tools, including [gsecdump](https://attack.mitre.org/software/S0008) and WCE, on previously compromised websites.(Citation: Dell TG-3390)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1608.004",
+					"name": "Drive-by Target",
+					"url": "https://attack.mitre.org/techniques/T1608/004",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has embedded malicious code into websites to screen a potential victim's IP address and then exploit their browser if they are of interest.(Citation: Gallagher 2015)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1027.002",
+					"name": "Software Packing",
+					"url": "https://attack.mitre.org/techniques/T1027/002",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has packed malware and tools, including using VMProtect.(Citation: Trend Micro DRBControl February 2020)(Citation: Trend Micro Iron Tiger April 2021)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1027.013",
+					"name": "Encrypted/Encoded File",
+					"url": "https://attack.mitre.org/techniques/T1027/013",
+					"use": "A [Threat Group-3390](https://attack.mitre.org/groups/G0027) tool can encrypt payloads using XOR. [Threat Group-3390](https://attack.mitre.org/groups/G0027) malware is also obfuscated using Metasploit’s shikata_ga_nai encoder.(Citation: Nccgroup Emissary Panda May 2018)(Citation: Securelist LuckyMouse June 2018)(Citation: Unit42 Emissary Panda May 2019)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1027.015",
+					"name": "Compression",
+					"url": "https://attack.mitre.org/techniques/T1027/015",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) malware is compressed with LZNT1 compression.(Citation: Nccgroup Emissary Panda May 2018)(Citation: Securelist LuckyMouse June 2018)(Citation: Unit42 Emissary Panda May 2019)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1055.012",
+					"name": "Process Hollowing",
+					"url": "https://attack.mitre.org/techniques/T1055/012",
+					"use": "A [Threat Group-3390](https://attack.mitre.org/groups/G0027) tool can spawn `svchost.exe` and inject the payload into that process.(Citation: Nccgroup Emissary Panda May 2018)(Citation: Securelist LuckyMouse June 2018)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1070.004",
+					"name": "File Deletion",
+					"url": "https://attack.mitre.org/techniques/T1070/004",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has deleted existing logs and exfiltrated file archives from a victim.(Citation: SecureWorks BRONZE UNION June 2017)(Citation: Trend Micro DRBControl February 2020)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1070.005",
+					"name": "Network Share Connection Removal",
+					"url": "https://attack.mitre.org/techniques/T1070/005",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has detached network shares after exfiltrating files, likely to evade detection.(Citation: SecureWorks BRONZE UNION June 2017)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) actors obtain legitimate credentials using a variety of methods and use them to further lateral movement on victim networks.(Citation: Dell TG-3390)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1140",
+					"name": "Deobfuscate/Decode Files or Information",
+					"url": "https://attack.mitre.org/techniques/T1140",
+					"use": "During execution, [Threat Group-3390](https://attack.mitre.org/groups/G0027) malware deobfuscates and decompresses code that was encoded with Metasploit’s shikata_ga_nai encoder as well as compressed with LZNT1 compression.(Citation: Securelist LuckyMouse June 2018)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1574.001",
+					"name": "DLL",
+					"url": "https://attack.mitre.org/techniques/T1574/001",
+					"use": "[Threat Group-3390](https://attack.mitre.org/groups/G0027) has performed DLL search order hijacking to execute their payload.(Citation: Nccgroup Emissary Panda May 2018) [Threat Group-3390](https://attack.mitre.org/groups/G0027) has also used DLL side-loading, including by using legitimate Kaspersky antivirus variants as well as `rc.exe`, a legitimate Microsoft Resource Compiler.(Citation: Dell TG-3390)(Citation: SecureWorks BRONZE UNION June 2017)(Citation: Securelist LuckyMouse June 2018)(Citation: Unit42 Emissary Panda May 2019)(Citation: Lunghi Iron Tiger Linux)"
+				}
+			],
+			"software": [
+				{
+					"id": "S0039",
+					"name": "Net",
+					"url": "https://attack.mitre.org/software/S0039"
+				},
+				{
+					"id": "S0096",
+					"name": "Systeminfo",
+					"url": "https://attack.mitre.org/software/S0096"
+				},
+				{
+					"id": "S0008",
+					"name": "gsecdump",
+					"url": "https://attack.mitre.org/software/S0008"
+				},
+				{
+					"id": "S0013",
+					"name": "PlugX",
+					"url": "https://attack.mitre.org/software/S0013"
+				},
+				{
+					"id": "S0073",
+					"name": "ASPXSpy",
+					"url": "https://attack.mitre.org/software/S0073"
+				},
+				{
+					"id": "S0154",
+					"name": "Cobalt Strike",
+					"url": "https://attack.mitre.org/software/S0154"
+				},
+				{
+					"id": "S0002",
+					"name": "Mimikatz",
+					"url": "https://attack.mitre.org/software/S0002"
+				},
+				{
+					"id": "S0357",
+					"name": "Impacket",
+					"url": "https://attack.mitre.org/software/S0357"
+				}
+			],
+			"references": [
+				{
+					"title": "Counter Threat Unit Research Team. (2017, June 27). BRONZE UNION Cyberespionage Persists Despite Disclosures. Retrieved July 13, 2017.",
+					"url": "https://www.secureworks.com/research/bronze-union",
+					"source": "SecureWorks BRONZE UNION June 2017"
+				},
+				{
+					"title": "Dell SecureWorks Counter Threat Unit Threat Intelligence. (2015, August 5). Threat Group-3390 Targets Organizations for Cyberespionage. Retrieved August 18, 2018.",
+					"url": "https://www.secureworks.com/research/threat-group-3390-targets-organizations-for-cyberespionage",
+					"source": "Dell TG-3390"
+				},
+				{
+					"title": "Falcone, R. and Lancaster, T. (2019, May 28). Emissary Panda Attacks Middle East Government Sharepoint Servers. Retrieved July 9, 2019.",
+					"url": "https://unit42.paloaltonetworks.com/emissary-panda-attacks-middle-east-government-sharepoint-servers/",
+					"source": "Unit42 Emissary Panda May 2019"
+				},
+				{
+					"title": "Gallagher, S.. (2015, August 5). Newly discovered Chinese hacking group hacked 100+ websites to use as “watering holes”. Retrieved January 25, 2016.",
+					"url": "http://arstechnica.com/security/2015/08/newly-discovered-chinese-hacking-group-hacked-100-websites-to-use-as-watering-holes/",
+					"source": "Gallagher 2015"
+				},
+				{
+					"title": "Khandelwal, S. (2018, June 14). Chinese Hackers Carried Out Country-Level Watering Hole Attack. Retrieved August 18, 2018.",
+					"url": "https://thehackernews.com/2018/06/chinese-watering-hole-attack.html",
+					"source": "Hacker News LuckyMouse June 2018"
+				}
+			]
+		},
+		{
+			"key": "APT30",
+			"caseAlias": null,
+			"attackerLoc": [22.54, 114.06],
+			"attackerLabel": "중국 (선전)",
+			"targetLoc": [3.14, 101.69],
+			"targetLabel": "동남아 정부기관",
+			"operationType": "동남아 정부 대상 지정학 정보 수집",
+			"color": "#64c6a3",
+			"weight": 3,
+			"id": "G0013",
+			"mitreName": "APT30",
+			"aliases": ["APT30"],
+			"description": "[APT30](https://attack.mitre.org/groups/G0013) is a threat group suspected to be associated with the Chinese government. While [Naikon](https://attack.mitre.org/groups/G0019) shares some characteristics with [APT30](https://attack.mitre.org/groups/G0013), the two groups do not appear to be exact matches.(Citation: FireEye APT30)(Citation: Baumgartner Golovkin Naikon 2015)",
+			"mitreUrl": "https://attack.mitre.org/groups/G0013",
+			"version": "1.1",
+			"modified": "2024-11-17T15:05:25.104Z",
+			"techniques": [{
+				"tactic": "execution",
+				"id": "T1204.002",
+				"name": "Malicious File",
+				"url": "https://attack.mitre.org/techniques/T1204/002",
+				"use": "[APT30](https://attack.mitre.org/groups/G0013) has relied on users to execute malicious file attachments delivered via spearphishing emails.(Citation: FireEye APT30)"
+			}, {
+				"tactic": "initial-access",
+				"id": "T1566.001",
+				"name": "Spearphishing Attachment",
+				"url": "https://attack.mitre.org/techniques/T1566/001",
+				"use": "[APT30](https://attack.mitre.org/groups/G0013) has used spearphishing emails with malicious DOC attachments.(Citation: FireEye APT30)"
+			}],
+			"software": [
+				{
+					"id": "S0028",
+					"name": "SHIPSHAPE",
+					"url": "https://attack.mitre.org/software/S0028"
+				},
+				{
+					"id": "S0031",
+					"name": "BACKSPACE",
+					"url": "https://attack.mitre.org/software/S0031"
+				},
+				{
+					"id": "S0036",
+					"name": "FLASHFLOOD",
+					"url": "https://attack.mitre.org/software/S0036"
+				},
+				{
+					"id": "S0034",
+					"name": "NETEAGLE",
+					"url": "https://attack.mitre.org/software/S0034"
+				},
+				{
+					"id": "S0035",
+					"name": "SPACESHIP",
+					"url": "https://attack.mitre.org/software/S0035"
+				}
+			],
+			"references": [{
+				"title": "Baumgartner, K., Golovkin, M.. (2015, May 14). The Naikon APT. Retrieved January 14, 2015.",
+				"url": "https://securelist.com/the-naikon-apt/69953/",
+				"source": "Baumgartner Golovkin Naikon 2015"
+			}, {
+				"title": "FireEye Labs. (2015, April). APT30 AND THE MECHANICS OF A LONG-RUNNING CYBER ESPIONAGE OPERATION. Retrieved November 17, 2024.",
+				"url": "https://media.kasperskycontenthub.com/wp-content/uploads/sites/43/2015/05/20081935/rpt-apt30.pdf",
+				"source": "FireEye APT30"
+			}]
+		},
+		{
+			"key": "APT40",
+			"caseAlias": "TEMP.Periscope / Leviathan",
+			"attackerLoc": [24.48, 118.08],
+			"attackerLabel": "중국 (샤먼)",
+			"targetLoc": [51.5, -.12],
+			"targetLabel": "해양 연구·방산·에너지",
+			"operationType": "해양·에너지 인프라 정보 탈취",
+			"color": "#40b8ce",
+			"weight": 4,
+			"id": "G0065",
+			"mitreName": "Leviathan",
+			"aliases": [
+				"Leviathan",
+				"MUDCARP",
+				"Kryptonite Panda",
+				"Gadolinium",
+				"BRONZE MOHAWK",
+				"TEMP.Jumper",
+				"APT40",
+				"TEMP.Periscope",
+				"Gingham Typhoon"
+			],
+			"description": "[Leviathan](https://attack.mitre.org/groups/G0065) is a Chinese state-sponsored cyber espionage group that has been attributed to the Ministry of State Security's (MSS) Hainan State Security Department and an affiliated front company.(Citation: CISA AA21-200A APT40 July 2021) Active since at least 2009, [Leviathan](https://attack.mitre.org/groups/G0065) has targeted the following sectors: academia, aerospace/aviation, biomedical, defense industrial base, government, healthcare, manufacturing, maritime, and transportation across the US, Canada, Australia, Europe, the Middle East, and Southeast Asia.(Citation: CISA AA21-200A APT40 July 2021)(Citation: Proofpoint Leviathan Oct 2017)(Citation: FireEye Periscope March 2018)(Citation: CISA Leviathan 2024)",
+			"mitreUrl": "https://attack.mitre.org/groups/G0065",
+			"version": "4.1",
+			"modified": "2025-02-03T21:55:54.314Z",
+			"techniques": [
+				{
+					"tactic": "collection",
+					"id": "T1074.001",
+					"name": "Local Data Staging",
+					"url": "https://attack.mitre.org/techniques/T1074/001",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used C:\\Windows\\Debug and C:\\Perflogs as staging directories.(Citation: FireEye Periscope March 2018)(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1074.002",
+					"name": "Remote Data Staging",
+					"url": "https://attack.mitre.org/techniques/T1074/002",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has staged data remotely prior to exfiltration.(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1560",
+					"name": "Archive Collected Data",
+					"url": "https://attack.mitre.org/techniques/T1560",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has archived victim's data prior to exfiltration.(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1090.003",
+					"name": "Multi-hop Proxy",
+					"url": "https://attack.mitre.org/techniques/T1090/003",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used multi-hop proxies to disguise the source of their malicious traffic.(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1102.003",
+					"name": "One-Way Communication",
+					"url": "https://attack.mitre.org/techniques/T1102/003",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has received C2 instructions from user profiles created on legitimate websites such as Github and TechNet.(Citation: FireEye Periscope March 2018)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1105",
+					"name": "Ingress Tool Transfer",
+					"url": "https://attack.mitre.org/techniques/T1105",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has downloaded additional scripts and files from adversary-controlled servers.(Citation: Proofpoint Leviathan Oct 2017)(Citation: FireEye Periscope March 2018)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1572",
+					"name": "Protocol Tunneling",
+					"url": "https://attack.mitre.org/techniques/T1572",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used protocol tunneling to further conceal C2 communications and infrastructure.(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1003",
+					"name": "OS Credential Dumping",
+					"url": "https://attack.mitre.org/techniques/T1003",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used publicly available tools to dump password hashes, including [HOMEFRY](https://attack.mitre.org/software/S0232).(Citation: FireEye APT40 March 2019)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1003.001",
+					"name": "LSASS Memory",
+					"url": "https://attack.mitre.org/techniques/T1003/001",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used publicly available tools to dump password hashes, including ProcDump and WCE.(Citation: FireEye APT40 March 2019)"
+				},
+				{
+					"tactic": "defense-impairment",
+					"id": "T1553.002",
+					"name": "Code Signing",
+					"url": "https://attack.mitre.org/techniques/T1553/002",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used stolen code signing certificates to sign malware.(Citation: FireEye Periscope March 2018)(Citation: FireEye APT40 March 2019)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1047",
+					"name": "Windows Management Instrumentation",
+					"url": "https://attack.mitre.org/techniques/T1047",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used WMI for execution.(Citation: Proofpoint Leviathan Oct 2017)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1059.001",
+					"name": "PowerShell",
+					"url": "https://attack.mitre.org/techniques/T1059/001",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used PowerShell for execution.(Citation: Proofpoint Leviathan Oct 2017)(Citation: FireEye Periscope March 2018)(Citation: CISA AA21-200A APT40 July 2021)(Citation: Accenture MUDCARP March 2019)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1059.005",
+					"name": "Visual Basic",
+					"url": "https://attack.mitre.org/techniques/T1059/005",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used VBScript.(Citation: Proofpoint Leviathan Oct 2017)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1197",
+					"name": "BITS Jobs",
+					"url": "https://attack.mitre.org/techniques/T1197",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used [BITSAdmin](https://attack.mitre.org/software/S0190) to download additional tools.(Citation: FireEye Periscope March 2018)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1203",
+					"name": "Exploitation for Client Execution",
+					"url": "https://attack.mitre.org/techniques/T1203",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has exploited multiple Microsoft Office and .NET vulnerabilities for execution, including CVE-2017-0199, CVE-2017-8759, and CVE-2017-11882.(Citation: Proofpoint Leviathan Oct 2017)(Citation: FireEye Periscope March 2018)(Citation: CISA AA21-200A APT40 July 2021)(Citation: Accenture MUDCARP March 2019)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1204.001",
+					"name": "Malicious Link",
+					"url": "https://attack.mitre.org/techniques/T1204/001",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has sent spearphishing email links attempting to get a user to click.(Citation: Proofpoint Leviathan Oct 2017)(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1204.002",
+					"name": "Malicious File",
+					"url": "https://attack.mitre.org/techniques/T1204/002",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has sent spearphishing attachments attempting to get a user to click.(Citation: Proofpoint Leviathan Oct 2017)(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1559.002",
+					"name": "Dynamic Data Exchange",
+					"url": "https://attack.mitre.org/techniques/T1559/002",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has utilized OLE as a method to insert malicious content inside various phishing documents. (Citation: Accenture MUDCARP March 2019)"
+				},
+				{
+					"tactic": "exfiltration",
+					"id": "T1041",
+					"name": "Exfiltration Over C2 Channel",
+					"url": "https://attack.mitre.org/techniques/T1041",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has exfiltrated data over its C2 channel.(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "exfiltration",
+					"id": "T1567.002",
+					"name": "Exfiltration to Cloud Storage",
+					"url": "https://attack.mitre.org/techniques/T1567/002",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used an uploader known as LUNCHMONEY that can exfiltrate files to Dropbox.(Citation: Proofpoint Leviathan Oct 2017)(Citation: FireEye Periscope March 2018)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has obtained valid accounts to gain initial access.(Citation: CISA AA21-200A APT40 July 2021)(Citation: Accenture MUDCARP March 2019)(Citation: CISA Leviathan 2024)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1133",
+					"name": "External Remote Services",
+					"url": "https://attack.mitre.org/techniques/T1133",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used external remote services such as virtual private networks (VPN) to gain initial access.(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1189",
+					"name": "Drive-by Compromise",
+					"url": "https://attack.mitre.org/techniques/T1189",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has infected victims using watering holes.(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1190",
+					"name": "Exploit Public-Facing Application",
+					"url": "https://attack.mitre.org/techniques/T1190",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used exploits against publicly-disclosed vulnerabilities for initial access into victim networks.(Citation: CISA Leviathan 2024)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1566.001",
+					"name": "Spearphishing Attachment",
+					"url": "https://attack.mitre.org/techniques/T1566/001",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has sent spearphishing emails with malicious attachments, including .rtf, .doc, and .xls files.(Citation: Proofpoint Leviathan Oct 2017)(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1566.002",
+					"name": "Spearphishing Link",
+					"url": "https://attack.mitre.org/techniques/T1566/002",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has sent spearphishing emails with links, often using a fraudulent lookalike domain and stolen branding.(Citation: Proofpoint Leviathan Oct 2017)(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "lateral-movement",
+					"id": "T1021.001",
+					"name": "Remote Desktop Protocol",
+					"url": "https://attack.mitre.org/techniques/T1021/001",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has targeted RDP credentials and used it to move through the victim environment.(Citation: FireEye APT40 March 2019)"
+				},
+				{
+					"tactic": "lateral-movement",
+					"id": "T1021.004",
+					"name": "SSH",
+					"url": "https://attack.mitre.org/techniques/T1021/004",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) used ssh for internal reconnaissance.(Citation: FireEye APT40 March 2019)"
+				},
+				{
+					"tactic": "lateral-movement",
+					"id": "T1534",
+					"name": "Internal Spearphishing",
+					"url": "https://attack.mitre.org/techniques/T1534",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has conducted internal spearphishing within the victim's environment for lateral movement.(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has obtained valid accounts to gain initial access.(Citation: CISA AA21-200A APT40 July 2021)(Citation: Accenture MUDCARP March 2019)(Citation: CISA Leviathan 2024)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1133",
+					"name": "External Remote Services",
+					"url": "https://attack.mitre.org/techniques/T1133",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used external remote services such as virtual private networks (VPN) to gain initial access.(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1197",
+					"name": "BITS Jobs",
+					"url": "https://attack.mitre.org/techniques/T1197",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used [BITSAdmin](https://attack.mitre.org/software/S0190) to download additional tools.(Citation: FireEye Periscope March 2018)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1505.003",
+					"name": "Web Shell",
+					"url": "https://attack.mitre.org/techniques/T1505/003",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) relies on web shells for an initial foothold as well as persistence into the victim's systems.(Citation: FireEye APT40 March 2019)(Citation: CISA AA21-200A APT40 July 2021)(Citation: CISA Leviathan 2024)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1546.003",
+					"name": "Windows Management Instrumentation Event Subscription",
+					"url": "https://attack.mitre.org/techniques/T1546/003",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used WMI for persistence.(Citation: FireEye Periscope March 2018)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1547.001",
+					"name": "Registry Run Keys / Startup Folder",
+					"url": "https://attack.mitre.org/techniques/T1547/001",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used JavaScript to create a shortcut file in the Startup folder that points to its main backdoor.(Citation: Proofpoint Leviathan Oct 2017)(Citation: FireEye Periscope March 2018)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1547.009",
+					"name": "Shortcut Modification",
+					"url": "https://attack.mitre.org/techniques/T1547/009",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used JavaScript to create a shortcut file in the Startup folder that points to its main backdoor.(Citation: Proofpoint Leviathan Oct 2017)(Citation: FireEye Periscope March 2018)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1055.001",
+					"name": "Dynamic-link Library Injection",
+					"url": "https://attack.mitre.org/techniques/T1055/001",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has utilized techniques like reflective DLL loading to write a DLL into memory and load a shell that provides backdoor access to the victim.(Citation: Accenture MUDCARP March 2019)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has obtained valid accounts to gain initial access.(Citation: CISA AA21-200A APT40 July 2021)(Citation: Accenture MUDCARP March 2019)(Citation: CISA Leviathan 2024)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1546.003",
+					"name": "Windows Management Instrumentation Event Subscription",
+					"url": "https://attack.mitre.org/techniques/T1546/003",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used WMI for persistence.(Citation: FireEye Periscope March 2018)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1547.001",
+					"name": "Registry Run Keys / Startup Folder",
+					"url": "https://attack.mitre.org/techniques/T1547/001",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used JavaScript to create a shortcut file in the Startup folder that points to its main backdoor.(Citation: Proofpoint Leviathan Oct 2017)(Citation: FireEye Periscope March 2018)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1547.009",
+					"name": "Shortcut Modification",
+					"url": "https://attack.mitre.org/techniques/T1547/009",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used JavaScript to create a shortcut file in the Startup folder that points to its main backdoor.(Citation: Proofpoint Leviathan Oct 2017)(Citation: FireEye Periscope March 2018)"
+				},
+				{
+					"tactic": "reconnaissance",
+					"id": "T1589.001",
+					"name": "Credentials",
+					"url": "https://attack.mitre.org/techniques/T1589/001",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has collected compromised credentials to use for targeting efforts.(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "reconnaissance",
+					"id": "T1595.002",
+					"name": "Vulnerability Scanning",
+					"url": "https://attack.mitre.org/techniques/T1595/002",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has conducted reconnaissance against target networks of interest looking for vulnerable, end-of-life, or no longer maintainted devices against which to rapidly deploy exploits.(Citation: CISA Leviathan 2024)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1583.001",
+					"name": "Domains",
+					"url": "https://attack.mitre.org/techniques/T1583/001",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has established domains that impersonate legitimate entities to use for targeting efforts. (Citation: CISA AA21-200A APT40 July 2021)(Citation: Accenture MUDCARP March 2019)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1584.004",
+					"name": "Server",
+					"url": "https://attack.mitre.org/techniques/T1584/004",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used compromised legitimate websites as command and control nodes for operations.(Citation: CISA Leviathan 2024)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1584.008",
+					"name": "Network Devices",
+					"url": "https://attack.mitre.org/techniques/T1584/008",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used compromised networking devices, such as small office/home office (SOHO) devices, as operational command and control infrastructure.(Citation: CISA Leviathan 2024)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1585.001",
+					"name": "Social Media Accounts",
+					"url": "https://attack.mitre.org/techniques/T1585/001",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has created new social media accounts for targeting efforts.(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1585.002",
+					"name": "Email Accounts",
+					"url": "https://attack.mitre.org/techniques/T1585/002",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has created new email accounts for targeting efforts.(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1586.001",
+					"name": "Social Media Accounts",
+					"url": "https://attack.mitre.org/techniques/T1586/001",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has compromised social media accounts to conduct social engineering attacks.(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1586.002",
+					"name": "Email Accounts",
+					"url": "https://attack.mitre.org/techniques/T1586/002",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has compromised email accounts to conduct social engineering attacks.(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1587.004",
+					"name": "Exploits",
+					"url": "https://attack.mitre.org/techniques/T1587/004",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has rapidly transformed and adapted public exploit proof-of-concept code for new vulnerabilities and utilized them against target networks.(Citation: CISA Leviathan 2024)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1027.001",
+					"name": "Binary Padding",
+					"url": "https://attack.mitre.org/techniques/T1027/001",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has inserted garbage characters into code, presumably to avoid anti-virus detection.(Citation: Proofpoint Leviathan Oct 2017)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1027.003",
+					"name": "Steganography",
+					"url": "https://attack.mitre.org/techniques/T1027/003",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used steganography to hide stolen data inside other files stored on Github.(Citation: CISA AA21-200A APT40 July 2021)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1027.013",
+					"name": "Encrypted/Encoded File",
+					"url": "https://attack.mitre.org/techniques/T1027/013",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has obfuscated code using base64.(Citation: Proofpoint Leviathan Oct 2017)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1027.015",
+					"name": "Compression",
+					"url": "https://attack.mitre.org/techniques/T1027/015",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has obfuscated code using gzip compression.(Citation: Proofpoint Leviathan Oct 2017)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1055.001",
+					"name": "Dynamic-link Library Injection",
+					"url": "https://attack.mitre.org/techniques/T1055/001",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has utilized techniques like reflective DLL loading to write a DLL into memory and load a shell that provides backdoor access to the victim.(Citation: Accenture MUDCARP March 2019)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has obtained valid accounts to gain initial access.(Citation: CISA AA21-200A APT40 July 2021)(Citation: Accenture MUDCARP March 2019)(Citation: CISA Leviathan 2024)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1140",
+					"name": "Deobfuscate/Decode Files or Information",
+					"url": "https://attack.mitre.org/techniques/T1140",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used a DLL known as SeDll to decrypt and execute other JavaScript backdoors.(Citation: Proofpoint Leviathan Oct 2017)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1197",
+					"name": "BITS Jobs",
+					"url": "https://attack.mitre.org/techniques/T1197",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used [BITSAdmin](https://attack.mitre.org/software/S0190) to download additional tools.(Citation: FireEye Periscope March 2018)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1218.010",
+					"name": "Regsvr32",
+					"url": "https://attack.mitre.org/techniques/T1218/010",
+					"use": "[Leviathan](https://attack.mitre.org/groups/G0065) has used regsvr32 for execution.(Citation: Proofpoint Leviathan Oct 2017)"
+				}
+			],
+			"software": [
+				{
+					"id": "S0005",
+					"name": "Windows Credential Editor",
+					"url": "https://attack.mitre.org/software/S0005"
+				},
+				{
+					"id": "S0190",
+					"name": "BITSAdmin",
+					"url": "https://attack.mitre.org/software/S0190"
+				},
+				{
+					"id": "S0232",
+					"name": "HOMEFRY",
+					"url": "https://attack.mitre.org/software/S0232"
+				},
+				{
+					"id": "S0021",
+					"name": "Derusbi",
+					"url": "https://attack.mitre.org/software/S0021"
+				},
+				{
+					"id": "S0110",
+					"name": "at",
+					"url": "https://attack.mitre.org/software/S0110"
+				},
+				{
+					"id": "S0069",
+					"name": "BLACKCOFFEE",
+					"url": "https://attack.mitre.org/software/S0069"
+				},
+				{
+					"id": "S0642",
+					"name": "BADFLICK",
+					"url": "https://attack.mitre.org/software/S0642"
+				},
+				{
+					"id": "S0363",
+					"name": "Empire",
+					"url": "https://attack.mitre.org/software/S0363"
+				}
+			],
+			"references": [
+				{
+					"title": "Accenture iDefense Unit. (2019, March 5). Mudcarp's Focus on Submarine Technologies. Retrieved August 24, 2021.",
+					"url": "https://www.accenture.com/us-en/blogs/cyber-defense/mudcarps-focus-on-submarine-technologies",
+					"source": "Accenture MUDCARP March 2019"
+				},
+				{
+					"title": "Adam Kozy. (2018, August 30). Two Birds, One Stone Panda. Retrieved August 24, 2021.",
+					"url": "https://www.crowdstrike.com/blog/two-birds-one-stone-panda/",
+					"source": "Crowdstrike KRYPTONITE PANDA August 2018"
+				},
+				{
+					"title": "Axel F, Pierre T. (2017, October 16). Leviathan: Espionage actor spearphishes maritime and defense targets. Retrieved February 15, 2018.",
+					"url": "https://www.proofpoint.com/us/threat-insight/post/leviathan-espionage-actor-spearphishes-maritime-and-defense-targets",
+					"source": "Proofpoint Leviathan Oct 2017"
+				},
+				{
+					"title": "Ben Koehl, Joe Hannon. (2020, September 24). Microsoft Security - Detecting Empires in the Cloud. Retrieved August 24, 2021.",
+					"url": "https://www.microsoft.com/security/blog/2020/09/24/gadolinium-detecting-empires-cloud/",
+					"source": "MSTIC GADOLINIUM September 2020"
+				},
+				{
+					"title": "CISA et al. (2024, July 8). People’s Republic of China (PRC) Ministry of State Security APT40 Tradecraft in Action. Retrieved February 3, 2025.",
+					"url": "https://www.cisa.gov/news-events/cybersecurity-advisories/aa24-190a",
+					"source": "CISA Leviathan 2024"
+				}
+			]
+		},
+		{
+			"key": "APT41",
+			"caseAlias": "Double Dragon / Barium / Wicked Panda",
+			"attackerLoc": [39.9, 116.4],
+			"attackerLabel": "중국 (베이징)",
+			"c2Loc": [22.31, 114.17],
+			"c2Label": "홍콩 (C2 서버)",
+			"targetLoc": [37.47, 127.02],
+			"targetLabel": "대한민국 통신·의료",
+			"operationType": "사이버 첩보와 금전 목적 복합 작전",
+			"color": "#6f9cf0",
+			"weight": 5,
+			"id": "G0096",
+			"mitreName": "APT41",
+			"aliases": [
+				"APT41",
+				"Wicked Panda",
+				"Brass Typhoon",
+				"BARIUM"
+			],
+			"description": "[APT41](https://attack.mitre.org/groups/G0096) is a threat group that researchers have assessed as Chinese state-sponsored espionage group that also conducts financially-motivated operations. Active since at least 2012, [APT41](https://attack.mitre.org/groups/G0096) has been observed targeting various industries, including but not limited to healthcare, telecom, technology, finance, education, retail and video game industries in 14 countries.(Citation: apt41_mandiant) Notable behaviors include using a wide range of malware and tools to complete mission objectives. [APT41](https://attack.mitre.org/groups/G0096) overlaps at least partially with public reporting on groups including BARIUM and [Winnti Group](https://attack.mitre.org/groups/G0044).(Citation: FireEye APT41 Aug 2019)(Citation: Group IB APT 41 June 2021)",
+			"mitreUrl": "https://attack.mitre.org/groups/G0096",
+			"version": "4.2",
+			"modified": "2025-06-11T20:13:29.024Z",
+			"techniques": [
+				{
+					"tactic": "collection",
+					"id": "T1005",
+					"name": "Data from Local System",
+					"url": "https://attack.mitre.org/techniques/T1005",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has uploaded files and data from a compromised host.(Citation: Group IB APT 41 June 2021)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1056.001",
+					"name": "Keylogging",
+					"url": "https://attack.mitre.org/techniques/T1056/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used a keylogger called GEARSHIFT on a target system.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1213.003",
+					"name": "Code Repositories",
+					"url": "https://attack.mitre.org/techniques/T1213/003",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) cloned victim user Git repositories during intrusions.(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1560.001",
+					"name": "Archive via Utility",
+					"url": "https://attack.mitre.org/techniques/T1560/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) created a RAR archive of targeted files for exfiltration.(Citation: FireEye APT41 Aug 2019) Additionally, [APT41](https://attack.mitre.org/groups/G0096) used the makecab.exe utility to both download tools, such as NATBypass, to the victim network and to archive a file for exfiltration.(Citation: apt41_dcsocytec_dec2022)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1008",
+					"name": "Fallback Channels",
+					"url": "https://attack.mitre.org/techniques/T1008",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used the Steam community page as a fallback mechanism for C2.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1071.001",
+					"name": "Web Protocols",
+					"url": "https://attack.mitre.org/techniques/T1071/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used HTTP to download payloads for CVE-2019-19781 and CVE-2020-10189 exploits.(Citation: FireEye APT41 March 2020)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1071.002",
+					"name": "File Transfer Protocols",
+					"url": "https://attack.mitre.org/techniques/T1071/002",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used exploit payloads that initiate download via [ftp](https://attack.mitre.org/software/S0095).(Citation: FireEye APT41 March 2020)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1071.004",
+					"name": "DNS",
+					"url": "https://attack.mitre.org/techniques/T1071/004",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used DNS for C2 communications.(Citation: FireEye APT41 Aug 2019)(Citation: Group IB APT 41 June 2021)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1090",
+					"name": "Proxy",
+					"url": "https://attack.mitre.org/techniques/T1090",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used a tool called CLASSFON to covertly proxy network communications.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1102.001",
+					"name": "Dead Drop Resolver",
+					"url": "https://attack.mitre.org/techniques/T1102/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used legitimate websites for C2 through dead drop resolvers (DDR), including GitHub, Pastebin, and Microsoft TechNet.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1104",
+					"name": "Multi-Stage Channels",
+					"url": "https://attack.mitre.org/techniques/T1104",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used the storescyncsvc.dll BEACON backdoor to download a secondary backdoor.(Citation: FireEye APT41 March 2020)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1105",
+					"name": "Ingress Tool Transfer",
+					"url": "https://attack.mitre.org/techniques/T1105",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used [certutil](https://attack.mitre.org/software/S0160) to download additional files.(Citation: FireEye APT41 March 2020)(Citation: Crowdstrike GTR2020 Mar 2020)(Citation: Group IB APT 41 June 2021) [APT41](https://attack.mitre.org/groups/G0096) downloaded post-exploitation tools such as [Cobalt Strike](https://attack.mitre.org/software/S0154) via command shell following initial access.(Citation: Rostovcev APT41 2021) [APT41](https://attack.mitre.org/groups/G0096) has uploaded Procdump and NATBypass to a staging directory and has used these tools in follow-on activities.(Citation: apt41_dcsocytec_dec2022)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1568.002",
+					"name": "Domain Generation Algorithms",
+					"url": "https://attack.mitre.org/techniques/T1568/002",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has used DGAs to change their C2 servers monthly.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1003.001",
+					"name": "LSASS Memory",
+					"url": "https://attack.mitre.org/techniques/T1003/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has used hashdump, [Mimikatz](https://attack.mitre.org/software/S0002), Procdump, and the Windows Credential Editor to dump password hashes from memory and authenticate to other user accounts.(Citation: FireEye APT41 Aug 2019)(Citation: Group IB APT 41 June 2021)(Citation: apt41_dcsocytec_dec2022)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1003.002",
+					"name": "Security Account Manager",
+					"url": "https://attack.mitre.org/techniques/T1003/002",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) extracted user account data from the Security Account Managerr (SAM), making a copy of this database from the registry using the <code>reg save</code> command or by exploiting volume shadow copies.(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1003.003",
+					"name": "NTDS",
+					"url": "https://attack.mitre.org/techniques/T1003/003",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used ntdsutil to obtain a copy of the victim environment <code>ntds.dit</code> file.(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1056.001",
+					"name": "Keylogging",
+					"url": "https://attack.mitre.org/techniques/T1056/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used a keylogger called GEARSHIFT on a target system.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1110",
+					"name": "Brute Force",
+					"url": "https://attack.mitre.org/techniques/T1110",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) performed password brute-force attacks on the local admin account.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1555",
+					"name": "Credentials from Password Stores",
+					"url": "https://attack.mitre.org/techniques/T1555",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has obtained information about accounts, lists of employees, and plaintext and hashed passwords from databases.(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1555.003",
+					"name": "Credentials from Web Browsers",
+					"url": "https://attack.mitre.org/techniques/T1555/003",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used BrowserGhost, a tool designed to obtain credentials from browsers, to retrieve information from password stores.(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "defense-impairment",
+					"id": "T1112",
+					"name": "Modify Registry",
+					"url": "https://attack.mitre.org/techniques/T1112",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used a malware variant called GOODLUCK to modify the registry in order to steal credentials.(Citation: FireEye APT41 Aug 2019)(Citation: Group IB APT 41 June 2021)"
+				},
+				{
+					"tactic": "defense-impairment",
+					"id": "T1484.001",
+					"name": "Group Policy Modification",
+					"url": "https://attack.mitre.org/techniques/T1484/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used scheduled tasks created via Group Policy Objects (GPOs) to deploy ransomware.(Citation: apt41_mandiant)"
+				},
+				{
+					"tactic": "defense-impairment",
+					"id": "T1553.002",
+					"name": "Code Signing",
+					"url": "https://attack.mitre.org/techniques/T1553/002",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) leveraged code-signing certificates to sign malware when targeting both gaming and non-gaming organizations.(Citation: FireEye APT41 Aug 2019)(Citation: Group IB APT 41 June 2021)"
+				},
+				{
+					"tactic": "defense-impairment",
+					"id": "T1599",
+					"name": "Network Boundary Bridging",
+					"url": "https://attack.mitre.org/techniques/T1599",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used `NATBypass` to bypass firewall restrictions and to access compromised systems via RDP.(Citation: apt41_dcsocytec_dec2022)"
+				},
+				{
+					"tactic": "defense-impairment",
+					"id": "T1685",
+					"name": "Disable or Modify Tools",
+					"url": "https://attack.mitre.org/techniques/T1685",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) developed a custom injector that enables an Event Tracing for Windows (ETW) bypass, making malicious processes invisible to Windows logging.(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "defense-impairment",
+					"id": "T1685.005",
+					"name": "Clear Windows Event Logs",
+					"url": "https://attack.mitre.org/techniques/T1685/005",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) attempted to remove evidence of some of its activity by clearing Windows security and system events.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1012",
+					"name": "Query Registry",
+					"url": "https://attack.mitre.org/techniques/T1012",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) queried registry values to determine items such as configured RDP ports and network configurations.(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1016",
+					"name": "System Network Configuration Discovery",
+					"url": "https://attack.mitre.org/techniques/T1016",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) collected MAC addresses from victim machines.(Citation: FireEye APT41 Aug 2019)(Citation: Group IB APT 41 June 2021)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1018",
+					"name": "Remote System Discovery",
+					"url": "https://attack.mitre.org/techniques/T1018",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has used MiPing to discover active systems in the victim network.(Citation: apt41_dcsocytec_dec2022)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1033",
+					"name": "System Owner/User Discovery",
+					"url": "https://attack.mitre.org/techniques/T1033",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has executed <code>whoami</code> commands, including using the WMIEXEC utility to execute this on remote machines.(Citation: FireEye APT41 Aug 2019)(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1046",
+					"name": "Network Service Discovery",
+					"url": "https://attack.mitre.org/techniques/T1046",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used a malware variant called WIDETONE to conduct port scans on specified subnets.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1049",
+					"name": "System Network Connections Discovery",
+					"url": "https://attack.mitre.org/techniques/T1049",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has enumerated IP addresses of network resources and used the <code>netstat</code> command as part of network reconnaissance. The group has also used a malware variant, HIGHNOON, to enumerate active RDP sessions.(Citation: FireEye APT41 Aug 2019)(Citation: Group IB APT 41 June 2021)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1069",
+					"name": "Permission Groups Discovery",
+					"url": "https://attack.mitre.org/techniques/T1069",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used <code>net group</code> commands to enumerate various Windows user groups and permissions.(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1082",
+					"name": "System Information Discovery",
+					"url": "https://attack.mitre.org/techniques/T1082",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) uses multiple built-in commands such as <code>systeminfo</code> and `net config Workstation` to enumerate victim system basic configuration information.(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1083",
+					"name": "File and Directory Discovery",
+					"url": "https://attack.mitre.org/techniques/T1083",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has executed <code>file /bin/pwd</code> on exploited victims, perhaps to return architecture related information.(Citation: FireEye APT41 March 2020)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1087.001",
+					"name": "Local Account",
+					"url": "https://attack.mitre.org/techniques/T1087/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used built-in <code>net</code> commands to enumerate local administrator groups.(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1087.002",
+					"name": "Domain Account",
+					"url": "https://attack.mitre.org/techniques/T1087/002",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used built-in <code>net</code> commands to enumerate domain administrator users.(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1135",
+					"name": "Network Share Discovery",
+					"url": "https://attack.mitre.org/techniques/T1135",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used the <code>net share</code> command as part of network reconnaissance.(Citation: FireEye APT41 Aug 2019)(Citation: Group IB APT 41 June 2021)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1047",
+					"name": "Windows Management Instrumentation",
+					"url": "https://attack.mitre.org/techniques/T1047",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used WMI in several ways, including for execution of commands via WMIEXEC as well as for persistence via [PowerSploit](https://attack.mitre.org/software/S0194).(Citation: FireEye APT41 Aug 2019)(Citation: Group IB APT 41 June 2021) [APT41](https://attack.mitre.org/groups/G0096) has executed files through Windows Management Instrumentation (WMI).(Citation: apt41_dcsocytec_dec2022)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1053.005",
+					"name": "Scheduled Task",
+					"url": "https://attack.mitre.org/techniques/T1053/005",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used a compromised account to create a scheduled task on a system.(Citation: FireEye APT41 Aug 2019)(Citation: Crowdstrike GTR2020 Mar 2020)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1059.001",
+					"name": "PowerShell",
+					"url": "https://attack.mitre.org/techniques/T1059/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) leveraged PowerShell to deploy malware families in victims’ environments.(Citation: FireEye APT41 Aug 2019)(Citation: FireEye APT41 March 2020)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1059.003",
+					"name": "Windows Command Shell",
+					"url": "https://attack.mitre.org/techniques/T1059/003",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used <code>cmd.exe /c</code> to execute commands on remote machines.(Citation: FireEye APT41 Aug 2019) [APT41](https://attack.mitre.org/groups/G0096) used a batch file to install persistence for the [Cobalt Strike](https://attack.mitre.org/software/S0154) BEACON loader.(Citation: FireEye APT41 March 2020)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1059.004",
+					"name": "Unix Shell",
+					"url": "https://attack.mitre.org/techniques/T1059/004",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used Linux shell commands for system survey and information gathering prior to exploitation of vulnerabilities such as CVE-2019-19871.(Citation: FireEye APT41 March 2020)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1197",
+					"name": "BITS Jobs",
+					"url": "https://attack.mitre.org/techniques/T1197",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used [BITSAdmin](https://attack.mitre.org/software/S0190) to download and install payloads.(Citation: FireEye APT41 March 2020)(Citation: Crowdstrike GTR2020 Mar 2020)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1203",
+					"name": "Exploitation for Client Execution",
+					"url": "https://attack.mitre.org/techniques/T1203",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) leveraged the follow exploits in their operations: CVE-2012-0158, CVE-2015-1641, CVE-2017-0199, CVE-2017-11882, and CVE-2019-3396.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1569.002",
+					"name": "Service Execution",
+					"url": "https://attack.mitre.org/techniques/T1569/002",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used svchost.exe and [Net](https://attack.mitre.org/software/S0039) to execute a system service installed to launch a [Cobalt Strike](https://attack.mitre.org/software/S0154) BEACON loader.(Citation: FireEye APT41 March 2020)(Citation: Group IB APT 41 June 2021)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1574.001",
+					"name": "DLL",
+					"url": "https://attack.mitre.org/techniques/T1574/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has used search order hijacking to execute malicious payloads, such as [Winnti for Windows](https://attack.mitre.org/software/S0141).(Citation: Crowdstrike GTR2020 Mar 2020) [APT41](https://attack.mitre.org/groups/G0096) has also used legitimate executables to perform DLL side-loading of their malware.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1574.006",
+					"name": "Dynamic Linker Hijacking",
+					"url": "https://attack.mitre.org/techniques/T1574/006",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has configured payloads to load via LD_PRELOAD.(Citation: Crowdstrike GTR2020 Mar 2020)"
+				},
+				{
+					"tactic": "exfiltration",
+					"id": "T1030",
+					"name": "Data Transfer Size Limits",
+					"url": "https://attack.mitre.org/techniques/T1030",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) transfers post-exploitation files dividing the payload into fixed-size chunks to evade detection.(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "impact",
+					"id": "T1486",
+					"name": "Data Encrypted for Impact",
+					"url": "https://attack.mitre.org/techniques/T1486",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used a ransomware called Encryptor RaaS to encrypt files on the targeted systems and provide a ransom note to the user.(Citation: FireEye APT41 Aug 2019) [APT41](https://attack.mitre.org/groups/G0096) also used Microsoft Bitlocker to encrypt workstations and Jetico’s BestCrypt to encrypt servers.(Citation: apt41_dcsocytec_dec2022)"
+				},
+				{
+					"tactic": "impact",
+					"id": "T1496.001",
+					"name": "Compute Hijacking",
+					"url": "https://attack.mitre.org/techniques/T1496/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) deployed a Monero cryptocurrency mining tool in a victim’s environment.(Citation: FireEye APT41 Aug 2019)(Citation: apt41_mandiant)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used compromised credentials to log on to other systems.(Citation: FireEye APT41 Aug 2019)(Citation: Crowdstrike GTR2020 Mar 2020)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1133",
+					"name": "External Remote Services",
+					"url": "https://attack.mitre.org/techniques/T1133",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) compromised an online billing/payment service using VPN access between a third-party service provider and the targeted payment service.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1190",
+					"name": "Exploit Public-Facing Application",
+					"url": "https://attack.mitre.org/techniques/T1190",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) exploited CVE-2020-10189 against Zoho ManageEngine Desktop Central through unsafe deserialization, and CVE-2019-19781 to compromise Citrix Application Delivery Controllers (ADC) and gateway devices.(Citation: FireEye APT41 March 2020) [APT41](https://attack.mitre.org/groups/G0096) leveraged vulnerabilities such as ProxyLogon exploitation or SQL injection for initial access.(Citation: Rostovcev APT41 2021) [APT41](https://attack.mitre.org/groups/G0096) exploited CVE-2021-26855 against a vulnerable Microsoft Exchange Server to gain initial access to the victim network.(Citation: apt41_dcsocytec_dec2022)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1195.002",
+					"name": "Compromise Software Supply Chain",
+					"url": "https://attack.mitre.org/techniques/T1195/002",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) gained access to production environments where they could inject malicious code into legitimate, signed files and widely distribute them to end users.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1566.001",
+					"name": "Spearphishing Attachment",
+					"url": "https://attack.mitre.org/techniques/T1566/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) sent spearphishing emails with attachments such as compiled HTML (.chm) files to initially compromise their victims.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "lateral-movement",
+					"id": "T1021.001",
+					"name": "Remote Desktop Protocol",
+					"url": "https://attack.mitre.org/techniques/T1021/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used RDP for lateral movement.(Citation: FireEye APT41 Aug 2019)(Citation: Crowdstrike GTR2020 Mar 2020) [APT41](https://attack.mitre.org/groups/G0096) used NATBypass to expose local RDP ports on compromised systems to the Internet.(Citation: apt41_dcsocytec_dec2022)"
+				},
+				{
+					"tactic": "lateral-movement",
+					"id": "T1021.002",
+					"name": "SMB/Windows Admin Shares",
+					"url": "https://attack.mitre.org/techniques/T1021/002",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has transferred implant files using Windows Admin Shares and the Server Message Block (SMB) protocol, then executes files through Windows Management Instrumentation (WMI).(Citation: Crowdstrike GTR2020 Mar 2020)(Citation: apt41_dcsocytec_dec2022)"
+				},
+				{
+					"tactic": "lateral-movement",
+					"id": "T1550.002",
+					"name": "Pass the Hash",
+					"url": "https://attack.mitre.org/techniques/T1550/002",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) uses tools such as [Mimikatz](https://attack.mitre.org/software/S0002) to enable lateral movement via captured password hashes.(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "lateral-movement",
+					"id": "T1570",
+					"name": "Lateral Tool Transfer",
+					"url": "https://attack.mitre.org/techniques/T1570",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) uses remote shares to move and remotely execute payloads during lateral movemement.(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1037",
+					"name": "Boot or Logon Initialization Scripts",
+					"url": "https://attack.mitre.org/techniques/T1037",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used a hidden shell script in `/etc/rc.d/init.d` to leverage the `ADORE.XSEC`backdoor and `Adore-NG` rootkit.(Citation: apt41_mandiant)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1053.005",
+					"name": "Scheduled Task",
+					"url": "https://attack.mitre.org/techniques/T1053/005",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used a compromised account to create a scheduled task on a system.(Citation: FireEye APT41 Aug 2019)(Citation: Crowdstrike GTR2020 Mar 2020)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used compromised credentials to log on to other systems.(Citation: FireEye APT41 Aug 2019)(Citation: Crowdstrike GTR2020 Mar 2020)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1098.007",
+					"name": "Additional Local or Domain Groups",
+					"url": "https://attack.mitre.org/techniques/T1098/007",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has added user accounts to the User and Admin groups.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1112",
+					"name": "Modify Registry",
+					"url": "https://attack.mitre.org/techniques/T1112",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used a malware variant called GOODLUCK to modify the registry in order to steal credentials.(Citation: FireEye APT41 Aug 2019)(Citation: Group IB APT 41 June 2021)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1133",
+					"name": "External Remote Services",
+					"url": "https://attack.mitre.org/techniques/T1133",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) compromised an online billing/payment service using VPN access between a third-party service provider and the targeted payment service.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1136.001",
+					"name": "Local Account",
+					"url": "https://attack.mitre.org/techniques/T1136/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has created user accounts.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1197",
+					"name": "BITS Jobs",
+					"url": "https://attack.mitre.org/techniques/T1197",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used [BITSAdmin](https://attack.mitre.org/software/S0190) to download and install payloads.(Citation: FireEye APT41 March 2020)(Citation: Crowdstrike GTR2020 Mar 2020)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1542.003",
+					"name": "Bootkit",
+					"url": "https://attack.mitre.org/techniques/T1542/003",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) deployed Master Boot Record bootkits on Windows systems to hide their malware and maintain persistence on victim systems.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1543.003",
+					"name": "Windows Service",
+					"url": "https://attack.mitre.org/techniques/T1543/003",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) modified legitimate Windows services to install malware backdoors.(Citation: FireEye APT41 Aug 2019)(Citation: Group IB APT 41 June 2021) [APT41](https://attack.mitre.org/groups/G0096) created the StorSyncSvc service to provide persistence for [Cobalt Strike](https://attack.mitre.org/software/S0154).(Citation: FireEye APT41 March 2020)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1546.008",
+					"name": "Accessibility Features",
+					"url": "https://attack.mitre.org/techniques/T1546/008",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) leveraged sticky keys to establish persistence.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1547.001",
+					"name": "Registry Run Keys / Startup Folder",
+					"url": "https://attack.mitre.org/techniques/T1547/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) created and modified startup files for persistence.(Citation: FireEye APT41 Aug 2019)(Citation: Group IB APT 41 June 2021) [APT41](https://attack.mitre.org/groups/G0096) added a registry key in <code>HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Svchost</code> to establish persistence for [Cobalt Strike](https://attack.mitre.org/software/S0154).(Citation: FireEye APT41 March 2020)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1037",
+					"name": "Boot or Logon Initialization Scripts",
+					"url": "https://attack.mitre.org/techniques/T1037",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used a hidden shell script in `/etc/rc.d/init.d` to leverage the `ADORE.XSEC`backdoor and `Adore-NG` rootkit.(Citation: apt41_mandiant)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1053.005",
+					"name": "Scheduled Task",
+					"url": "https://attack.mitre.org/techniques/T1053/005",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used a compromised account to create a scheduled task on a system.(Citation: FireEye APT41 Aug 2019)(Citation: Crowdstrike GTR2020 Mar 2020)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1055",
+					"name": "Process Injection",
+					"url": "https://attack.mitre.org/techniques/T1055",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) malware TIDYELF loaded the main WINTERLOVE component by injecting it into the iexplore.exe process.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used compromised credentials to log on to other systems.(Citation: FireEye APT41 Aug 2019)(Citation: Crowdstrike GTR2020 Mar 2020)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1098.007",
+					"name": "Additional Local or Domain Groups",
+					"url": "https://attack.mitre.org/techniques/T1098/007",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has added user accounts to the User and Admin groups.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1484.001",
+					"name": "Group Policy Modification",
+					"url": "https://attack.mitre.org/techniques/T1484/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used scheduled tasks created via Group Policy Objects (GPOs) to deploy ransomware.(Citation: apt41_mandiant)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1543.003",
+					"name": "Windows Service",
+					"url": "https://attack.mitre.org/techniques/T1543/003",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) modified legitimate Windows services to install malware backdoors.(Citation: FireEye APT41 Aug 2019)(Citation: Group IB APT 41 June 2021) [APT41](https://attack.mitre.org/groups/G0096) created the StorSyncSvc service to provide persistence for [Cobalt Strike](https://attack.mitre.org/software/S0154).(Citation: FireEye APT41 March 2020)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1546.008",
+					"name": "Accessibility Features",
+					"url": "https://attack.mitre.org/techniques/T1546/008",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) leveraged sticky keys to establish persistence.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1547.001",
+					"name": "Registry Run Keys / Startup Folder",
+					"url": "https://attack.mitre.org/techniques/T1547/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) created and modified startup files for persistence.(Citation: FireEye APT41 Aug 2019)(Citation: Group IB APT 41 June 2021) [APT41](https://attack.mitre.org/groups/G0096) added a registry key in <code>HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Svchost</code> to establish persistence for [Cobalt Strike](https://attack.mitre.org/software/S0154).(Citation: FireEye APT41 March 2020)"
+				},
+				{
+					"tactic": "reconnaissance",
+					"id": "T1595.002",
+					"name": "Vulnerability Scanning",
+					"url": "https://attack.mitre.org/techniques/T1595/002",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used the Acunetix SQL injection vulnerability scanner in target reconnaissance operations, as well as the JexBoss tool to identify vulnerabilities in Java applications.(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "reconnaissance",
+					"id": "T1595.003",
+					"name": "Wordlist Scanning",
+					"url": "https://attack.mitre.org/techniques/T1595/003",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) leverages various tools and frameworks to brute-force directories on web servers.(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "reconnaissance",
+					"id": "T1596.005",
+					"name": "Scan Databases",
+					"url": "https://attack.mitre.org/techniques/T1596/005",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) uses the Chinese website fofa.su, similar to the Shodan scanning service, for passive scanning of victims.(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1588.002",
+					"name": "Tool",
+					"url": "https://attack.mitre.org/techniques/T1588/002",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has obtained and used tools such as [Mimikatz](https://attack.mitre.org/software/S0002), [pwdump](https://attack.mitre.org/software/S0006), [PowerSploit](https://attack.mitre.org/software/S0194), and [Windows Credential Editor](https://attack.mitre.org/software/S0005).(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1014",
+					"name": "Rootkit",
+					"url": "https://attack.mitre.org/techniques/T1014",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) deployed rootkits on Linux systems.(Citation: FireEye APT41 Aug 2019)(Citation: Crowdstrike GTR2020 Mar 2020)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1027",
+					"name": "Obfuscated Files or Information",
+					"url": "https://attack.mitre.org/techniques/T1027",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used VMProtected binaries in multiple intrusions.(Citation: FireEye APT41 March 2020)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1027.002",
+					"name": "Software Packing",
+					"url": "https://attack.mitre.org/techniques/T1027/002",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) uses packers such as Themida to obfuscate malicious files.(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1036.004",
+					"name": "Masquerade Task or Service",
+					"url": "https://attack.mitre.org/techniques/T1036/004",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has created services to appear as benign system tools.(Citation: Group IB APT 41 June 2021)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1036.005",
+					"name": "Match Legitimate Resource Name or Location",
+					"url": "https://attack.mitre.org/techniques/T1036/005",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) attempted to masquerade their files as popular anti-virus software.(Citation: FireEye APT41 Aug 2019)(Citation: Group IB APT 41 June 2021)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1055",
+					"name": "Process Injection",
+					"url": "https://attack.mitre.org/techniques/T1055",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) malware TIDYELF loaded the main WINTERLOVE component by injecting it into the iexplore.exe process.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1070.003",
+					"name": "Clear Command History",
+					"url": "https://attack.mitre.org/techniques/T1070/003",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) attempted to remove evidence of some of its activity by deleting Bash histories.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1070.004",
+					"name": "File Deletion",
+					"url": "https://attack.mitre.org/techniques/T1070/004",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) deleted files from the system.(Citation: FireEye APT41 Aug 2019)(Citation: Rostovcev APT41 2021)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used compromised credentials to log on to other systems.(Citation: FireEye APT41 Aug 2019)(Citation: Crowdstrike GTR2020 Mar 2020)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1197",
+					"name": "BITS Jobs",
+					"url": "https://attack.mitre.org/techniques/T1197",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used [BITSAdmin](https://attack.mitre.org/software/S0190) to download and install payloads.(Citation: FireEye APT41 March 2020)(Citation: Crowdstrike GTR2020 Mar 2020)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1218.001",
+					"name": "Compiled HTML File",
+					"url": "https://attack.mitre.org/techniques/T1218/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) used compiled HTML (.chm) files for targeting.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1218.011",
+					"name": "Rundll32",
+					"url": "https://attack.mitre.org/techniques/T1218/011",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has used rundll32.exe to execute a loader.(Citation: Crowdstrike GTR2020 Mar 2020)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1480.001",
+					"name": "Environmental Keying",
+					"url": "https://attack.mitre.org/techniques/T1480/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has encrypted payloads using the Data Protection API (DPAPI), which relies on keys tied to specific user accounts on specific machines. [APT41](https://attack.mitre.org/groups/G0096) has also environmentally keyed second stage malware with an RC5 key derived in part from the infected system's volume serial number.(Citation: Twitter ItsReallyNick APT41 EK)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1542.003",
+					"name": "Bootkit",
+					"url": "https://attack.mitre.org/techniques/T1542/003",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) deployed Master Boot Record bootkits on Windows systems to hide their malware and maintain persistence on victim systems.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1574.001",
+					"name": "DLL",
+					"url": "https://attack.mitre.org/techniques/T1574/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has used search order hijacking to execute malicious payloads, such as [Winnti for Windows](https://attack.mitre.org/software/S0141).(Citation: Crowdstrike GTR2020 Mar 2020) [APT41](https://attack.mitre.org/groups/G0096) has also used legitimate executables to perform DLL side-loading of their malware.(Citation: FireEye APT41 Aug 2019)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1574.006",
+					"name": "Dynamic Linker Hijacking",
+					"url": "https://attack.mitre.org/techniques/T1574/006",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) has configured payloads to load via LD_PRELOAD.(Citation: Crowdstrike GTR2020 Mar 2020)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1684.001",
+					"name": "Impersonation",
+					"url": "https://attack.mitre.org/techniques/T1684/001",
+					"use": "[APT41](https://attack.mitre.org/groups/G0096) impersonated an employee at a video game developer company to send phishing emails.(Citation: apt41_mandiant)"
+				}
+			],
+			"software": [
+				{
+					"id": "S0073",
+					"name": "ASPXSpy",
+					"url": "https://attack.mitre.org/software/S0073"
+				},
+				{
+					"id": "S0190",
+					"name": "BITSAdmin",
+					"url": "https://attack.mitre.org/software/S0190"
+				},
+				{
+					"id": "S0013",
+					"name": "PlugX",
+					"url": "https://attack.mitre.org/software/S0013"
+				},
+				{
+					"id": "S0357",
+					"name": "Impacket",
+					"url": "https://attack.mitre.org/software/S0357"
+				},
+				{
+					"id": "S0032",
+					"name": "gh0st RAT",
+					"url": "https://attack.mitre.org/software/S0032"
+				},
+				{
+					"id": "S0104",
+					"name": "netstat",
+					"url": "https://attack.mitre.org/software/S0104"
+				},
+				{
+					"id": "S0194",
+					"name": "PowerSploit",
+					"url": "https://attack.mitre.org/software/S0194"
+				},
+				{
+					"id": "S0412",
+					"name": "ZxShell",
+					"url": "https://attack.mitre.org/software/S0412"
+				}
+			],
+			"references": [
+				{
+					"title": "Crowdstrike. (2020, March 2). 2020 Global Threat Report. Retrieved December 11, 2020.",
+					"url": "https://go.crowdstrike.com/rs/281-OBQ-266/images/Report2020CrowdStrikeGlobalThreatReport.pdf",
+					"source": "Crowdstrike GTR2020 Mar 2020"
+				},
+				{
+					"title": "FireEye. (2019). Double DragonAPT41, a dual espionage andcyber crime operationAPT41. Retrieved September 23, 2019.",
+					"url": "https://www.mandiant.com/sites/default/files/2022-02/rt-apt41-dual-operation.pdf",
+					"source": "FireEye APT41 2019"
+				},
+				{
+					"title": "Fraser, N., et al. (2019, August 7). Double DragonAPT41, a dual espionage and cyber crime operation APT41. Retrieved September 23, 2019.",
+					"url": "https://www.mandiant.com/sites/default/files/2022-02/rt-apt41-dual-operation.pdf",
+					"source": "FireEye APT41 Aug 2019"
+				},
+				{
+					"title": "Mandiant. (n.d.). APT41, A DUAL ESPIONAGE AND CYBER CRIME OPERATION. Retrieved June 11, 2024.",
+					"url": "https://www.mandiant.com/sites/default/files/2022-02/rt-apt41-dual-operation.pdf",
+					"source": "apt41_mandiant"
+				},
+				{
+					"title": "Microsoft . (2023, July 12). How Microsoft names threat actors. Retrieved November 17, 2023.",
+					"url": "https://learn.microsoft.com/en-us/microsoft-365/security/intelligence/microsoft-threat-actor-naming?view=o365-worldwide",
+					"source": "Microsoft Threat Actor Naming July 2023"
+				}
+			]
+		},
+		{
+			"key": "Salt Typhoon",
+			"caseAlias": "GhostEmperor",
+			"attackerLoc": [39.9, 116.4],
+			"attackerLabel": "중국 (베이징)",
+			"targetLoc": [38.9, -77.03],
+			"targetLabel": "미국 통신·인터넷 사업자",
+			"operationType": "통신 인프라 침해 및 감청 정보 수집",
+			"color": "#b991ff",
+			"weight": 5,
+			"id": "G1045",
+			"mitreName": "Salt Typhoon",
+			"aliases": ["Salt Typhoon"],
+			"description": "[Salt Typhoon](https://attack.mitre.org/groups/G1045) is a People's Republic of China (PRC) state-backed actor that has been active since at least 2019 and responsible for numerous compromises of network infrastructure at major U.S. telecommunication and internet service providers (ISP).(Citation: US Dept. of Treasury Salt Typhoon JAN 2025)(Citation: Cisco Salt Typhoon FEB 2025)",
+			"mitreUrl": "https://attack.mitre.org/groups/G1045",
+			"version": "1.0",
+			"modified": "2025-03-06T20:09:16.402Z",
+			"techniques": [
+				{
+					"tactic": "collection",
+					"id": "T1602.002",
+					"name": "Network Device Configuration Dump",
+					"url": "https://attack.mitre.org/techniques/T1602/002",
+					"use": "[Salt Typhoon](https://attack.mitre.org/groups/G1045) has attempted to acquire credentials by dumping network device configurations.(Citation: Cisco Salt Typhoon FEB 2025)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1572",
+					"name": "Protocol Tunneling",
+					"url": "https://attack.mitre.org/techniques/T1572",
+					"use": "[Salt Typhoon](https://attack.mitre.org/groups/G1045) has modified device configurations to create and use Generic Routing Encapsulation (GRE) tunnels.(Citation: Cisco Salt Typhoon FEB 2025)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1040",
+					"name": "Network Sniffing",
+					"url": "https://attack.mitre.org/techniques/T1040",
+					"use": "[Salt Typhoon](https://attack.mitre.org/groups/G1045) has used a variety of tools and techniques to capture packet data between network interfaces.(Citation: Cisco Salt Typhoon FEB 2025)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1110.002",
+					"name": "Password Cracking",
+					"url": "https://attack.mitre.org/techniques/T1110/002",
+					"use": "[Salt Typhoon](https://attack.mitre.org/groups/G1045) has cracked passwords for accounts with weak encryption obtained from the configuration files of compromised network devices.(Citation: Cisco Salt Typhoon FEB 2025)"
+				},
+				{
+					"tactic": "defense-impairment",
+					"id": "T1685.006",
+					"name": "Clear Linux or Mac System Logs",
+					"url": "https://attack.mitre.org/techniques/T1685/006",
+					"use": "[Salt Typhoon](https://attack.mitre.org/groups/G1045) has cleared logs including .bash_history, auth.log, lastlog, wtmp, and btmp.(Citation: Cisco Salt Typhoon FEB 2025)"
+				},
+				{
+					"tactic": "defense-impairment",
+					"id": "T1686",
+					"name": "Disable or Modify System Firewall",
+					"url": "https://attack.mitre.org/techniques/T1686",
+					"use": "[Salt Typhoon](https://attack.mitre.org/groups/G1045) has made changes to the Access Control List (ACL) and loopback interface address on compromised devices.(Citation: Cisco Salt Typhoon FEB 2025)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1040",
+					"name": "Network Sniffing",
+					"url": "https://attack.mitre.org/techniques/T1040",
+					"use": "[Salt Typhoon](https://attack.mitre.org/groups/G1045) has used a variety of tools and techniques to capture packet data between network interfaces.(Citation: Cisco Salt Typhoon FEB 2025)"
+				},
+				{
+					"tactic": "exfiltration",
+					"id": "T1048.003",
+					"name": "Exfiltration Over Unencrypted Non-C2 Protocol",
+					"url": "https://attack.mitre.org/techniques/T1048/003",
+					"use": "[Salt Typhoon](https://attack.mitre.org/groups/G1045) has exfiltrated configuration files from exploited network devices over FTP and TFTP.(Citation: Cisco Salt Typhoon FEB 2025)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1190",
+					"name": "Exploit Public-Facing Application",
+					"url": "https://attack.mitre.org/techniques/T1190",
+					"use": "[Salt Typhoon](https://attack.mitre.org/groups/G1045) has exploited CVE-2018-0171 in the Smart Install feature of Cisco IOS and Cisco IOS XE software for initial access.(Citation: Cisco Salt Typhoon FEB 2025)"
+				},
+				{
+					"tactic": "lateral-movement",
+					"id": "T1021.004",
+					"name": "SSH",
+					"url": "https://attack.mitre.org/techniques/T1021/004",
+					"use": "[Salt Typhoon](https://attack.mitre.org/groups/G1045) has modified the loopback address on compromised switches and used them as the source of SSH connections to additional devices within the target environment, allowing them to bypass access control lists (ACLs).(Citation: Cisco Salt Typhoon FEB 2025)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1098.004",
+					"name": "SSH Authorized Keys",
+					"url": "https://attack.mitre.org/techniques/T1098/004",
+					"use": "[Salt Typhoon](https://attack.mitre.org/groups/G1045) has added SSH authorized_keys under root or other users at the Linux level on compromised network devices.(Citation: Cisco Salt Typhoon FEB 2025)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1136",
+					"name": "Create Account",
+					"url": "https://attack.mitre.org/techniques/T1136",
+					"use": "[Salt Typhoon](https://attack.mitre.org/groups/G1045) has created Linux-level users on compromised network devices through modification of `/etc/shadow` and `/etc/passwd`.(Citation: Cisco Salt Typhoon FEB 2025)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1098.004",
+					"name": "SSH Authorized Keys",
+					"url": "https://attack.mitre.org/techniques/T1098/004",
+					"use": "[Salt Typhoon](https://attack.mitre.org/groups/G1045) has added SSH authorized_keys under root or other users at the Linux level on compromised network devices.(Citation: Cisco Salt Typhoon FEB 2025)"
+				},
+				{
+					"tactic": "reconnaissance",
+					"id": "T1590.004",
+					"name": "Network Topology",
+					"url": "https://attack.mitre.org/techniques/T1590/004",
+					"use": "[Salt Typhoon](https://attack.mitre.org/groups/G1045) has used configuration files from exploited network devices to help discover upstream and downstream network segments.(Citation: Cisco Salt Typhoon FEB 2025)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1587.001",
+					"name": "Malware",
+					"url": "https://attack.mitre.org/techniques/T1587/001",
+					"use": "[Salt Typhoon](https://attack.mitre.org/groups/G1045) has used custom tooling including [JumbledPath](https://attack.mitre.org/software/S1206).(Citation: Cisco Salt Typhoon FEB 2025)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1588.002",
+					"name": "Tool",
+					"url": "https://attack.mitre.org/techniques/T1588/002",
+					"use": "[Salt Typhoon](https://attack.mitre.org/groups/G1045) has used publicly available tooling to exploit vulnerabilities.(Citation: Cisco Salt Typhoon FEB 2025)"
+				}
+			],
+			"software": [{
+				"id": "S1206",
+				"name": "JumbledPath",
+				"url": "https://attack.mitre.org/software/S1206"
+			}],
+			"references": [{
+				"title": "Cisco Talos. (2025, February 20). Weathering the storm: In the midst of a Typhoon. Retrieved February 24, 2025.",
+				"url": "https://blog.talosintelligence.com/salt-typhoon-analysis/",
+				"source": "Cisco Salt Typhoon FEB 2025"
+			}, {
+				"title": "US Department of Treasury. (2025, January 17). Treasury Sanctions Company Associated with Salt Typhoon and Hacker Associated with Treasury Compromise. Retrieved February 24, 2025.",
+				"url": "https://home.treasury.gov/news/press-releases/jy2792",
+				"source": "US Dept. of Treasury Salt Typhoon JAN 2025"
+			}]
+		},
+		{
+			"key": "Volt Typhoon",
+			"caseAlias": "Bronze Silhouette",
+			"attackerLoc": [31.23, 121.47],
+			"attackerLabel": "중국 (상하이)",
+			"targetLoc": [39.5, -98.35],
+			"targetLabel": "미국 전력·수도·교통",
+			"operationType": "핵심 인프라 장기 사전 배치",
+			"color": "#ff9f43",
+			"weight": 5,
+			"id": "G1017",
+			"mitreName": "Volt Typhoon",
+			"aliases": [
+				"Volt Typhoon",
+				"BRONZE SILHOUETTE",
+				"Vanguard Panda",
+				"DEV-0391",
+				"UNC3236",
+				"Voltzite",
+				"Insidious Taurus",
+				"DazedToad"
+			],
+			"description": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) is a People's Republic of China (PRC) state-sponsored actor that has been active since at least 2021, primarily targeting critical infrastructure organizations in the US and its territories including Guam. [Volt Typhoon](https://attack.mitre.org/groups/G1017)'s targeting and pattern of behavior have been assessed as pre-positioning to enable lateral movement to operational technology (OT) assets for potential destructive or disruptive attacks. [Volt Typhoon](https://attack.mitre.org/groups/G1017) has emphasized stealth in operations using web shells, living-off-the-land (LOTL) binaries, hands on keyboard activities, and stolen credentials.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)(Citation: Microsoft Volt Typhoon May 2023)(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)(Citation: Secureworks BRONZE SILHOUETTE May 2023). The group has leveraged compromised SOHO routers to proxy command and control traffic and obscure its infrastructure, activity associated with the KV botnet.(Citation: DOJ KVBotnet 2024). Reporting indicates a separate initial access cluster, SYLVANITE, has been observed exploiting internet-facing edge devices and transferring access to [Volt Typhoon](https://attack.mitre.org/groups/G1017), also tracked as VOLTZITE, for follow-on operations. (Citation: Dragos 2025 Year in Review)",
+			"mitreUrl": "https://attack.mitre.org/groups/G1017",
+			"version": "2.0",
+			"modified": "2026-04-27T03:57:23.174Z",
+			"techniques": [
+				{
+					"tactic": "collection",
+					"id": "T1005",
+					"name": "Data from Local System",
+					"url": "https://attack.mitre.org/techniques/T1005",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has stolen files from a sensitive file server and the Active Directory database from targeted environments, and used [Wevtutil](https://attack.mitre.org/software/S0645) to extract event log information.(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)(Citation: Secureworks BRONZE SILHOUETTE May 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1056.001",
+					"name": "Keylogging",
+					"url": "https://attack.mitre.org/techniques/T1056/001",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has created and accessed a file named rult3uil.log on compromised domain controllers to capture keypresses and command execution.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1074",
+					"name": "Data Staged",
+					"url": "https://attack.mitre.org/techniques/T1074",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has staged collected data in password-protected archives.(Citation: Microsoft Volt Typhoon May 2023)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1074.001",
+					"name": "Local Data Staging",
+					"url": "https://attack.mitre.org/techniques/T1074/001",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has saved stolen files including the `ntds.dit` database and the `SYSTEM` and `SECURITY` Registry hives locally to the `C:\\Windows\\Temp\\` directory.(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)(Citation: Secureworks BRONZE SILHOUETTE May 2023)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1113",
+					"name": "Screen Capture",
+					"url": "https://attack.mitre.org/techniques/T1113",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has obtained a screenshot of the victim's system using the gdi32.dll and gdiplus.dll libraries.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "collection",
+					"id": "T1560.001",
+					"name": "Archive via Utility",
+					"url": "https://attack.mitre.org/techniques/T1560/001",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has archived the ntds.dit database as a multi-volume password-protected archive with 7-Zip.(Citation: Secureworks BRONZE SILHOUETTE May 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1090",
+					"name": "Proxy",
+					"url": "https://attack.mitre.org/techniques/T1090",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used compromised devices and customized versions of open source tools such as [FRP](https://attack.mitre.org/software/S1144) (Fast Reverse Proxy), Earthworm, and [Impacket](https://attack.mitre.org/software/S0357) to proxy network traffic.(Citation: Microsoft Volt Typhoon May 2023)(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1090.001",
+					"name": "Internal Proxy",
+					"url": "https://attack.mitre.org/techniques/T1090/001",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used the built-in [netsh](https://attack.mitre.org/software/S0108) `port proxy` command to create proxies on compromised systems to facilitate access.(Citation: Microsoft Volt Typhoon May 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1090.003",
+					"name": "Multi-hop Proxy",
+					"url": "https://attack.mitre.org/techniques/T1090/003",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used multi-hop proxies for command-and-control infrastructure.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1105",
+					"name": "Ingress Tool Transfer",
+					"url": "https://attack.mitre.org/techniques/T1105",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has downloaded an outdated version of comsvcs.dll to a compromised domain controller in a non-standard folder.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "command-and-control",
+					"id": "T1573.001",
+					"name": "Symmetric Cryptography",
+					"url": "https://attack.mitre.org/techniques/T1573/001",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used a version of the Awen web shell that employed AES encryption and decryption for C2 communications.(Citation: Secureworks BRONZE SILHOUETTE May 2023)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1003.001",
+					"name": "LSASS Memory",
+					"url": "https://attack.mitre.org/techniques/T1003/001",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has attempted to access hashed credentials from the LSASS process memory space.(Citation: Microsoft Volt Typhoon May 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1003.003",
+					"name": "NTDS",
+					"url": "https://attack.mitre.org/techniques/T1003/003",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used ntds.util to create domain controller installation media containing usernames and password hashes.(Citation: Microsoft Volt Typhoon May 2023)(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)(Citation: Secureworks BRONZE SILHOUETTE May 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1056.001",
+					"name": "Keylogging",
+					"url": "https://attack.mitre.org/techniques/T1056/001",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has created and accessed a file named rult3uil.log on compromised domain controllers to capture keypresses and command execution.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1552",
+					"name": "Unsecured Credentials",
+					"url": "https://attack.mitre.org/techniques/T1552",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has obtained credentials insecurely stored on targeted network appliances.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1552.004",
+					"name": "Private Keys",
+					"url": "https://attack.mitre.org/techniques/T1552/004",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has accessed a Local State file that contains the AES key used to encrypt passwords stored in the Chrome browser.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1555",
+					"name": "Credentials from Password Stores",
+					"url": "https://attack.mitre.org/techniques/T1555",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has attempted to obtain credentials from OpenSSH, realvnc, and PuTTY.(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)"
+				},
+				{
+					"tactic": "credential-access",
+					"id": "T1555.003",
+					"name": "Credentials from Web Browsers",
+					"url": "https://attack.mitre.org/techniques/T1555/003",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has targeted network administrator browser data including browsing history and stored credentials.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "defense-impairment",
+					"id": "T1112",
+					"name": "Modify Registry",
+					"url": "https://attack.mitre.org/techniques/T1112",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used `netsh` to create a PortProxy Registry modification on a compromised server running the Paessler Router Traffic Grapher (PRTG).(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "defense-impairment",
+					"id": "T1685.005",
+					"name": "Clear Windows Event Logs",
+					"url": "https://attack.mitre.org/techniques/T1685/005",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has selectively cleared Windows Event Logs, system logs, and other technical artifacts to remove evidence of intrusion activity.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1007",
+					"name": "System Service Discovery",
+					"url": "https://attack.mitre.org/techniques/T1007",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used `net start` to list running services.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1010",
+					"name": "Application Window Discovery",
+					"url": "https://attack.mitre.org/techniques/T1010",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has collected window title information from compromised systems.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1012",
+					"name": "Query Registry",
+					"url": "https://attack.mitre.org/techniques/T1012",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has queried the Registry on compromised systems, `reg query hklm\\software\\`, for information on installed software including PuTTY.(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1016",
+					"name": "System Network Configuration Discovery",
+					"url": "https://attack.mitre.org/techniques/T1016",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has executed multiple commands to enumerate network topology and settings including `ipconfig`, `netsh interface firewall show all`, and `netsh interface portproxy show all`.(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1016.001",
+					"name": "Internet Connection Discovery",
+					"url": "https://attack.mitre.org/techniques/T1016/001",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has employed [Ping](https://attack.mitre.org/software/S0097) to check network connectivity.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1018",
+					"name": "Remote System Discovery",
+					"url": "https://attack.mitre.org/techniques/T1018",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used multiple methods, including [Ping](https://attack.mitre.org/software/S0097), to enumerate systems on compromised networks.(Citation: Microsoft Volt Typhoon May 2023)(Citation: Secureworks BRONZE SILHOUETTE May 2023)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1033",
+					"name": "System Owner/User Discovery",
+					"url": "https://attack.mitre.org/techniques/T1033",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used public tools and executed the PowerShell command `Get-EventLog security -instanceid 4624` to identify associated user and computer account names.(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)(Citation: Secureworks BRONZE SILHOUETTE May 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1046",
+					"name": "Network Service Discovery",
+					"url": "https://attack.mitre.org/techniques/T1046",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used commercial tools, LOTL utilities, and appliances already present on the system for network service discovery.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1049",
+					"name": "System Network Connections Discovery",
+					"url": "https://attack.mitre.org/techniques/T1049",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used `netstat -ano` on compromised hosts to enumerate network connections.(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)(Citation: Secureworks BRONZE SILHOUETTE May 2023)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1057",
+					"name": "Process Discovery",
+					"url": "https://attack.mitre.org/techniques/T1057",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has enumerated running processes on targeted systems including through the use of [Tasklist](https://attack.mitre.org/software/S0057).(Citation: Microsoft Volt Typhoon May 2023)(Citation: Secureworks BRONZE SILHOUETTE May 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1069",
+					"name": "Permission Groups Discovery",
+					"url": "https://attack.mitre.org/techniques/T1069",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used commercial tools, LOTL utilities, and appliances already present on the system for group and user discovery.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1069.001",
+					"name": "Local Groups",
+					"url": "https://attack.mitre.org/techniques/T1069/001",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has run `net localgroup administrators` in compromised environments to enumerate accounts.(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1069.002",
+					"name": "Domain Groups",
+					"url": "https://attack.mitre.org/techniques/T1069/002",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has run `net group` in compromised environments to discover domain groups.(Citation: Secureworks BRONZE SILHOUETTE May 2023)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1083",
+					"name": "File and Directory Discovery",
+					"url": "https://attack.mitre.org/techniques/T1083",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has enumerated directories containing vulnerability testing and cyber related content and facilities data such as construction drawings.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1087.001",
+					"name": "Local Account",
+					"url": "https://attack.mitre.org/techniques/T1087/001",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has executed `net user` and `quser` to enumerate local account information.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1087.002",
+					"name": "Domain Account",
+					"url": "https://attack.mitre.org/techniques/T1087/002",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has run `net group /dom` and `net group \"Domain Admins\" /dom` in compromised environments for account discovery.(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)(Citation: Secureworks BRONZE SILHOUETTE May 2023)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1120",
+					"name": "Peripheral Device Discovery",
+					"url": "https://attack.mitre.org/techniques/T1120",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has obtained victim's screen dimension and display device information.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1124",
+					"name": "System Time Discovery",
+					"url": "https://attack.mitre.org/techniques/T1124",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has obtained the victim's system timezone.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1217",
+					"name": "Browser Information Discovery",
+					"url": "https://attack.mitre.org/techniques/T1217",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has targeted the browsing history of network administrators.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1497.001",
+					"name": "System Checks",
+					"url": "https://attack.mitre.org/techniques/T1497/001",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has run system checks to determine if they were operating in a virtualized environment.(Citation: Microsoft Volt Typhoon May 2023)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1518",
+					"name": "Software Discovery",
+					"url": "https://attack.mitre.org/techniques/T1518",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has queried the Registry on compromised systems for information on installed software.(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1614",
+					"name": "System Location Discovery",
+					"url": "https://attack.mitre.org/techniques/T1614",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has obtained the victim's system current location.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1654",
+					"name": "Log Enumeration",
+					"url": "https://attack.mitre.org/techniques/T1654",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used `wevtutil.exe` and the PowerShell command `Get-EventLog security` to enumerate Windows logs to search for successful logons.(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "discovery",
+					"id": "T1680",
+					"name": "Local Storage Discovery",
+					"url": "https://attack.mitre.org/techniques/T1680",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has discovered file system types, drive names, size, and free space on compromised systems.(Citation: Microsoft Volt Typhoon May 2023)(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)(Citation: Secureworks BRONZE SILHOUETTE May 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1047",
+					"name": "Windows Management Instrumentation",
+					"url": "https://attack.mitre.org/techniques/T1047",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has leveraged WMIC for execution, remote system discovery, and to create and use temporary directories.(Citation: Microsoft Volt Typhoon May 2023)(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)(Citation: Secureworks BRONZE SILHOUETTE May 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1059.001",
+					"name": "PowerShell",
+					"url": "https://attack.mitre.org/techniques/T1059/001",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used PowerShell including for remote system discovery.(Citation: Microsoft Volt Typhoon May 2023)(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1059.003",
+					"name": "Windows Command Shell",
+					"url": "https://attack.mitre.org/techniques/T1059/003",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used the Windows command line to perform hands-on-keyboard activities in targeted environments including for discovery.(Citation: Microsoft Volt Typhoon May 2023)(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)(Citation: Secureworks BRONZE SILHOUETTE May 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "execution",
+					"id": "T1059.004",
+					"name": "Unix Shell",
+					"url": "https://attack.mitre.org/techniques/T1059/004",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used Brightmetricagent.exe which contains a command- line interface (CLI) library that can leverage command shells including Z Shell (zsh).(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) relies primarily on valid credentials for persistence.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1078.002",
+					"name": "Domain Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078/002",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used compromised domain accounts to authenticate to devices on compromised networks.(Citation: Microsoft Volt Typhoon May 2023)(Citation: Secureworks BRONZE SILHOUETTE May 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1133",
+					"name": "External Remote Services",
+					"url": "https://attack.mitre.org/techniques/T1133",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used VPNs to connect to victim environments and enable post-exploitation actions.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "initial-access",
+					"id": "T1190",
+					"name": "Exploit Public-Facing Application",
+					"url": "https://attack.mitre.org/techniques/T1190",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has gained initial access through exploitation of multiple vulnerabilities in internet-facing software and appliances such as Fortinet, Ivanti (formerly Pulse Secure), NETGEAR, Citrix, and Cisco.(Citation: Secureworks BRONZE SILHOUETTE May 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "lateral-movement",
+					"id": "T1021.001",
+					"name": "Remote Desktop Protocol",
+					"url": "https://attack.mitre.org/techniques/T1021/001",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has moved laterally to the Domain Controller via RDP using a compromised account with domain administrator privileges.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "lateral-movement",
+					"id": "T1570",
+					"name": "Lateral Tool Transfer",
+					"url": "https://attack.mitre.org/techniques/T1570",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has copied web shells between servers in targeted environments.(Citation: Secureworks BRONZE SILHOUETTE May 2023)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) relies primarily on valid credentials for persistence.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1078.002",
+					"name": "Domain Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078/002",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used compromised domain accounts to authenticate to devices on compromised networks.(Citation: Microsoft Volt Typhoon May 2023)(Citation: Secureworks BRONZE SILHOUETTE May 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1112",
+					"name": "Modify Registry",
+					"url": "https://attack.mitre.org/techniques/T1112",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used `netsh` to create a PortProxy Registry modification on a compromised server running the Paessler Router Traffic Grapher (PRTG).(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1133",
+					"name": "External Remote Services",
+					"url": "https://attack.mitre.org/techniques/T1133",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used VPNs to connect to victim environments and enable post-exploitation actions.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "persistence",
+					"id": "T1505.003",
+					"name": "Web Shell",
+					"url": "https://attack.mitre.org/techniques/T1505/003",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used webshells, including ones named AuditReport.jspx and iisstart.aspx, in compromised environments.(Citation: Secureworks BRONZE SILHOUETTE May 2023)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1068",
+					"name": "Exploitation for Privilege Escalation",
+					"url": "https://attack.mitre.org/techniques/T1068",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has gained initial access by exploiting privilege escalation vulnerabilities in the operating system or network services.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) relies primarily on valid credentials for persistence.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "privilege-escalation",
+					"id": "T1078.002",
+					"name": "Domain Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078/002",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used compromised domain accounts to authenticate to devices on compromised networks.(Citation: Microsoft Volt Typhoon May 2023)(Citation: Secureworks BRONZE SILHOUETTE May 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "reconnaissance",
+					"id": "T1589",
+					"name": "Gather Victim Identity Information",
+					"url": "https://attack.mitre.org/techniques/T1589",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has gathered victim identify information during pre-compromise reconnaissance. (Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "reconnaissance",
+					"id": "T1589.002",
+					"name": "Email Addresses",
+					"url": "https://attack.mitre.org/techniques/T1589/002",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has targeted the personal emails of key network and IT staff at victim organizations.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "reconnaissance",
+					"id": "T1590",
+					"name": "Gather Victim Network Information",
+					"url": "https://attack.mitre.org/techniques/T1590",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has conducted extensive pre-compromise reconnaissance to learn about the target organization’s network.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "reconnaissance",
+					"id": "T1590.004",
+					"name": "Network Topology",
+					"url": "https://attack.mitre.org/techniques/T1590/004",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has conducted extensive reconnaissance of victim networks including identifying network topologies.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "reconnaissance",
+					"id": "T1590.006",
+					"name": "Network Security Appliances",
+					"url": "https://attack.mitre.org/techniques/T1590/006",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has identified target network security measures as part of pre-compromise reconnaissance.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "reconnaissance",
+					"id": "T1591",
+					"name": "Gather Victim Org Information",
+					"url": "https://attack.mitre.org/techniques/T1591",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has conducted extensive reconnaissance pre-compromise to gain information about the targeted organization.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "reconnaissance",
+					"id": "T1591.004",
+					"name": "Identify Roles",
+					"url": "https://attack.mitre.org/techniques/T1591/004",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has identified key network and IT staff members pre-compromise at targeted organizations.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "reconnaissance",
+					"id": "T1592",
+					"name": "Gather Victim Host Information",
+					"url": "https://attack.mitre.org/techniques/T1592",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has conducted pre-compromise reconnaissance for victim host information.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "reconnaissance",
+					"id": "T1593",
+					"name": "Search Open Websites/Domains",
+					"url": "https://attack.mitre.org/techniques/T1593",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has conducted pre-compromise web searches for victim information.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "reconnaissance",
+					"id": "T1594",
+					"name": "Search Victim-Owned Websites",
+					"url": "https://attack.mitre.org/techniques/T1594",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has conducted pre-compromise reconnaissance on victim-owned sites.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "reconnaissance",
+					"id": "T1596.005",
+					"name": "Scan Databases",
+					"url": "https://attack.mitre.org/techniques/T1596/005",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used FOFA, Shodan, and Censys to search for exposed victim infrastructure.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1584.003",
+					"name": "Virtual Private Server",
+					"url": "https://attack.mitre.org/techniques/T1584/003",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has compromised Virtual Private Servers (VPS) to proxy C2 traffic.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1584.004",
+					"name": "Server",
+					"url": "https://attack.mitre.org/techniques/T1584/004",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used compromised Paessler Router Traffic Grapher (PRTG) servers from other organizations for C2.(Citation: Secureworks BRONZE SILHOUETTE May 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1584.005",
+					"name": "Botnet",
+					"url": "https://attack.mitre.org/techniques/T1584/005",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used compromised Cisco and NETGEAR end-of-life SOHO routers implanted with KV Botnet malware to support operations.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1584.008",
+					"name": "Network Devices",
+					"url": "https://attack.mitre.org/techniques/T1584/008",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has compromised small office and home office (SOHO) network edge devices, many of which were located in the same geographic area as the victim, to proxy network traffic.(Citation: Microsoft Volt Typhoon May 2023)(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1587.004",
+					"name": "Exploits",
+					"url": "https://attack.mitre.org/techniques/T1587/004",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has exploited zero-day vulnerabilities for initial access.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1588.002",
+					"name": "Tool",
+					"url": "https://attack.mitre.org/techniques/T1588/002",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used legitimate network and forensic tools and customized versions of open-source tools for C2.(Citation: Microsoft Volt Typhoon May 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "resource-development",
+					"id": "T1588.006",
+					"name": "Vulnerabilities",
+					"url": "https://attack.mitre.org/techniques/T1588/006",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used publicly available exploit code for initial access.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1006",
+					"name": "Direct Volume Access",
+					"url": "https://attack.mitre.org/techniques/T1006",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has executed the Windows-native `vssadmin` command to create volume shadow copies.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1027.002",
+					"name": "Software Packing",
+					"url": "https://attack.mitre.org/techniques/T1027/002",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used the Ultimate Packer for Executables (UPX) to obfuscate the FRP client files BrightmetricAgent.exe and SMSvcService.ex) and the port scanning utility ScanLine.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1036.005",
+					"name": "Match Legitimate Resource Name or Location",
+					"url": "https://attack.mitre.org/techniques/T1036/005",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used legitimate looking filenames for compressed copies of the ntds.dit database and used names including cisco_up.exe, cl64.exe, vm3dservice.exe, watchdogd.exe, Win.exe, WmiPreSV.exe, and WmiPrvSE.exe for the Earthworm and Fast Reverse Proxy tools.(Citation: Joint Cybersecurity Advisory Volt Typhoon June 2023)(Citation: Secureworks BRONZE SILHOUETTE May 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1036.008",
+					"name": "Masquerade File Type",
+					"url": "https://attack.mitre.org/techniques/T1036/008",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has appended copies of the ntds.dit database with a .gif file extension.(Citation: Secureworks BRONZE SILHOUETTE May 2023)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1070.004",
+					"name": "File Deletion",
+					"url": "https://attack.mitre.org/techniques/T1070/004",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has run `rd /S` to delete their working directories and deleted systeminfo.dat from `C:\\Users\\Public\\Documentsfiles`.(Citation: Secureworks BRONZE SILHOUETTE May 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1070.007",
+					"name": "Clear Network Connection History and Configurations",
+					"url": "https://attack.mitre.org/techniques/T1070/007",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has inspected server logs to remove their IPs.(Citation: Secureworks BRONZE SILHOUETTE May 2023)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1078",
+					"name": "Valid Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) relies primarily on valid credentials for persistence.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1078.002",
+					"name": "Domain Accounts",
+					"url": "https://attack.mitre.org/techniques/T1078/002",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used compromised domain accounts to authenticate to devices on compromised networks.(Citation: Microsoft Volt Typhoon May 2023)(Citation: Secureworks BRONZE SILHOUETTE May 2023)(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1140",
+					"name": "Deobfuscate/Decode Files or Information",
+					"url": "https://attack.mitre.org/techniques/T1140",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used Base64-encoded data to transfer payloads and commands, including deobfuscation via [certutil](https://attack.mitre.org/software/S0160).(Citation: Secureworks BRONZE SILHOUETTE May 2023)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1218",
+					"name": "System Binary Proxy Execution",
+					"url": "https://attack.mitre.org/techniques/T1218",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has used native tools and processes including living off the land binaries or “LOLBins\" to maintain and expand access to the victim networks.(Citation: CISA AA24-038A PRC Critical Infrastructure February 2024)"
+				},
+				{
+					"tactic": "stealth",
+					"id": "T1497.001",
+					"name": "System Checks",
+					"url": "https://attack.mitre.org/techniques/T1497/001",
+					"use": "[Volt Typhoon](https://attack.mitre.org/groups/G1017) has run system checks to determine if they were operating in a virtualized environment.(Citation: Microsoft Volt Typhoon May 2023)"
+				}
+			],
+			"software": [
+				{
+					"id": "S0108",
+					"name": "netsh",
+					"url": "https://attack.mitre.org/software/S0108"
+				},
+				{
+					"id": "S0029",
+					"name": "PsExec",
+					"url": "https://attack.mitre.org/software/S0029"
+				},
+				{
+					"id": "S0100",
+					"name": "ipconfig",
+					"url": "https://attack.mitre.org/software/S0100"
+				},
+				{
+					"id": "S0645",
+					"name": "Wevtutil",
+					"url": "https://attack.mitre.org/software/S0645"
+				},
+				{
+					"id": "S1154",
+					"name": "VersaMem",
+					"url": "https://attack.mitre.org/software/S1154"
+				},
+				{
+					"id": "S0057",
+					"name": "Tasklist",
+					"url": "https://attack.mitre.org/software/S0057"
+				},
+				{
+					"id": "S0002",
+					"name": "Mimikatz",
+					"url": "https://attack.mitre.org/software/S0002"
+				},
+				{
+					"id": "S0097",
+					"name": "Ping",
+					"url": "https://attack.mitre.org/software/S0097"
+				}
+			],
+			"references": [
+				{
+					"title": " Cloudflare. (2026, March 3). Introducing the 2026 Cloudflare Threat Report. Retrieved April 18, 2026.",
+					"url": "https://blog.cloudflare.com/2026-threat-report/",
+					"source": "Cloudflare 2026 Threat Report New Threat Actors March 2026"
+				},
+				{
+					"title": "CISA et al.. (2024, February 7). PRC State-Sponsored Actors Compromise and Maintain Persistent Access to U.S. Critical Infrastructure. Retrieved May 15, 2024.",
+					"url": "https://www.cisa.gov/sites/default/files/2024-03/aa24-038a_csa_prc_state_sponsored_actors_compromise_us_critical_infrastructure_3.pdf",
+					"source": "CISA AA24-038A PRC Critical Infrastructure February 2024"
+				},
+				{
+					"title": "Counter Threat Unit Research Team. (2023, May 24). Chinese Cyberespionage Group BRONZE SILHOUETTE Targets U.S. Government and Defense Organizations. Retrieved July 27, 2023.",
+					"url": "https://web.archive.org/web/20230601025540/https://www.secureworks.com/blog/chinese-cyberespionage-group-bronze-silhouette-targets-us-government-and-defense-organizations",
+					"source": "Secureworks BRONZE SILHOUETTE May 2023"
+				},
+				{
+					"title": "Dragos. (2026, February). 9TH ANNUAL YEAR IN REVIEW | OT/ICS CYBERSECURITY REPORT . Retrieved April 26, 2026.",
+					"url": "https://5943619.hs-sites.com/hubfs/312-Year-in-Review/2026/Dragos-2026-OT-Cybersecurity-Report-A-Year-in-Review.pdf?hsCtaAttrib=205683189348",
+					"source": "Dragos 2025 Year in Review"
+				},
+				{
+					"title": "Microsoft Threat Intelligence. (2023, May 24). Volt Typhoon targets US critical infrastructure with living-off-the-land techniques. Retrieved July 27, 2023.",
+					"url": "https://www.microsoft.com/en-us/security/blog/2023/05/24/volt-typhoon-targets-us-critical-infrastructure-with-living-off-the-land-techniques/",
+					"source": "Microsoft Volt Typhoon May 2023"
+				}
+			]
+		}
+	]
+};
+//#endregion
+//#region app/page.tsx
+var fallback = [{
+	id: "fallback-1",
+	title: "라이브 피드를 연결하는 중입니다",
+	description: "공식 RSS 수집기가 최신 사이버 보안 기사를 불러오고 있습니다.",
+	link: "https://thehackernews.com/",
+	publishedAt: (/* @__PURE__ */ new Date()).toISOString(),
+	source: "Cyber Atlas",
+	country: "Global",
+	countryLabel: "글로벌",
+	region: "글로벌",
+	lat: 20,
+	lng: 20,
+	originLat: 37.5,
+	originLng: 127,
+	originCountry: "OSINT 소스",
+	geoConfidence: 40,
+	severity: "medium",
+	category: "Live sync",
+	mitreGroups: []
+}];
+var sourceColors = {
+	"The Hacker News": "#43ddff",
+	"SecurityWeek": "#ffb64a",
+	"보안뉴스": "#b991ff",
+	"Cyber Atlas": "#6b8791"
+};
+var tacticLabels = {
+	"reconnaissance": "정찰",
+	"resource-development": "자원 개발",
+	"initial-access": "초기 접근",
+	"execution": "실행",
+	"persistence": "지속성",
+	"privilege-escalation": "권한 상승",
+	"defense-evasion": "방어 회피",
+	"credential-access": "자격증명 접근",
+	"discovery": "탐색",
+	"lateral-movement": "측면 이동",
+	"collection": "수집",
+	"command-and-control": "명령 및 제어",
+	"exfiltration": "유출",
+	"impact": "영향"
+};
+function relativeTime(date) {
+	const seconds = Math.max(0, (Date.now() - Date.parse(date)) / 1e3);
+	if (seconds < 60) return "방금 전";
+	if (seconds < 3600) return `${Math.floor(seconds / 60)}분 전`;
+	if (seconds < 86400) return `${Math.floor(seconds / 3600)}시간 전`;
+	return `${Math.floor(seconds / 86400)}일 전`;
+}
+function severityLabel(value) {
+	return {
+		critical: "CRITICAL",
+		high: "HIGH",
+		medium: "ELEVATED",
+		low: "MONITOR"
+	}[value];
+}
+function groupGlobeItem(group) {
+	return {
+		id: `apt-${group.id}`,
+		title: group.key,
+		lat: group.targetLoc[0],
+		lng: group.targetLoc[1],
+		originLat: group.attackerLoc[0],
+		originLng: group.attackerLoc[1],
+		country: group.targetLabel,
+		countryLabel: group.key,
+		severity: group.weight >= 5 ? "critical" : "high",
+		source: "MITRE ATT&CK"
+	};
+}
+function Home() {
+	const [items, setItems] = (0, import_react.useState)(fallback);
+	const [statuses, setStatuses] = (0, import_react.useState)([]);
+	const [activeId, setActiveId] = (0, import_react.useState)(fallback[0].id);
+	const [activeGroupId, setActiveGroupId] = (0, import_react.useState)(mitre_groups_default.groups[0].id);
+	const [layer, setLayer] = (0, import_react.useState)("news");
+	const [source, setSource] = (0, import_react.useState)("전체 소스");
+	const [query, setQuery] = (0, import_react.useState)("");
+	const [updatedAt, setUpdatedAt] = (0, import_react.useState)("");
+	const [loading, setLoading] = (0, import_react.useState)(true);
+	const [panel, setPanel] = (0, import_react.useState)(true);
+	const [selectedRegion, setSelectedRegion] = (0, import_react.useState)(null);
+	const [regionHistory, setRegionHistory] = (0, import_react.useState)(null);
+	const [regionLoading, setRegionLoading] = (0, import_react.useState)(false);
+	const regionRequest = (0, import_react.useRef)(0);
+	const loadNews = (0, import_react.useCallback)(async () => {
+		setLoading(true);
+		try {
+			const response = await fetch("/api/news", { cache: "no-store" });
+			if (!response.ok) throw new Error("feed request failed");
+			const data = await response.json();
+			if (data.items.length) {
+				setItems(data.items);
+				setActiveId((current) => data.items.some((item) => item.id === current) ? current : data.items[0].id);
+			}
+			setStatuses(data.sources);
+			setUpdatedAt(data.updatedAt);
+		} catch {
+			setStatuses((current) => current.length ? current : [{
+				source: "Live feeds",
+				ok: false,
+				count: 0,
+				error: "연결 재시도 중"
+			}]);
+		} finally {
+			setLoading(false);
+		}
+	}, []);
+	(0, import_react.useEffect)(() => {
+		loadNews();
+		const timer = window.setInterval(loadNews, 18e4);
+		return () => window.clearInterval(timer);
+	}, [loadNews]);
+	const recentForRegion = (0, import_react.useCallback)((region) => items.filter((item) => item.country === region.country || item.country !== "Global" && Math.hypot(item.lat - region.lat, item.lng - region.lng) < 6).filter((item) => Date.now() - Date.parse(item.publishedAt) < 30 * 864e5), [items]);
+	const handleRegionSelect = (0, import_react.useCallback)(async (region) => {
+		const requestId = ++regionRequest.current;
+		setSelectedRegion(region);
+		setPanel(true);
+		setRegionHistory(null);
+		setRegionLoading(false);
+		if (recentForRegion(region).length) return;
+		setRegionLoading(true);
+		try {
+			const response = await fetch(`/api/region-intel?country=${encodeURIComponent(region.country)}`, { cache: "no-store" });
+			if (!response.ok) throw new Error("historical search failed");
+			const history = await response.json();
+			if (regionRequest.current === requestId) setRegionHistory(history);
+		} catch {
+			if (regionRequest.current === requestId) setRegionHistory({
+				country: region.country,
+				mode: "historical",
+				articles: [],
+				mitreCases: [],
+				categories: [],
+				search: {
+					ok: false,
+					provider: "Historical search",
+					error: "과거 기사 검색을 완료하지 못했습니다."
+				},
+				searchedAt: (/* @__PURE__ */ new Date()).toISOString()
+			});
+		} finally {
+			if (regionRequest.current === requestId) setRegionLoading(false);
+		}
+	}, [recentForRegion]);
+	const sources = [
+		"전체 소스",
+		"The Hacker News",
+		"SecurityWeek",
+		"보안뉴스"
+	];
+	const filtered = (0, import_react.useMemo)(() => items.filter((item) => (source === "전체 소스" || item.source === source) && (!query || `${item.title} ${item.description} ${item.countryLabel} ${item.category} ${item.mitreGroups.map((group) => group.aliases.join(" ")).join(" ")}`.toLowerCase().includes(query.toLowerCase()))), [
+		items,
+		source,
+		query
+	]);
+	const filteredGroups = (0, import_react.useMemo)(() => mitre_groups_default.groups.filter((group) => !query || `${group.key} ${group.mitreName} ${group.aliases.join(" ")} ${group.operationType} ${group.targetLabel}`.toLowerCase().includes(query.toLowerCase())), [query]);
+	const selected = items.find((item) => item.id === activeId) ?? filtered[0] ?? items[0];
+	const selectedGroup = mitre_groups_default.groups.find((group) => group.id === activeGroupId) ?? mitre_groups_default.groups[0];
+	const groupArticles = items.filter((item) => item.mitreGroups.some((group) => group.id === selectedGroup.id)).slice(0, 4);
+	const tacticGroups = Object.entries(selectedGroup.techniques.reduce((all, technique) => {
+		(all[technique.tactic] ??= []).push(technique);
+		return all;
+	}, {}));
+	const criticalCount = items.filter((item) => item.severity === "critical").length;
+	const countries = new Set(items.map((item) => item.country).filter((country) => country !== "Global")).size;
+	const healthy = statuses.filter((status) => status.ok).length;
+	const risk = Math.min(96, 42 + criticalCount * 3 + Math.round(items.length / 4));
+	const globeItems = layer === "news" ? items : mitre_groups_default.groups.map(groupGlobeItem);
+	const globeActiveId = layer === "news" ? selected?.id : `apt-${selectedGroup.id}`;
+	const regionRecent = selectedRegion ? recentForRegion(selectedRegion) : [];
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "atlas-shell",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", {
+				className: "atlas-header",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "atlas-brand",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "signal-logo",
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {})
+							]
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("b", { children: ["CYBER", /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "ATLAS" })] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "GEOPOLITICAL THREAT OBSERVATORY" })] })]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "live-status",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { className: healthy ? "online" : "offline" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: healthy ? "LIVE INTELLIGENCE" : "RECONNECTING" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: updatedAt ? `${new Date(updatedAt).toLocaleTimeString("ko-KR", {
+							hour: "2-digit",
+							minute: "2-digit"
+						})} 동기화` : "공식 피드 연결 중" })] })]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "header-stats",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: layer === "news" ? "LIVE SIGNALS" : "ATT&CK GROUPS" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: String(layer === "news" ? items.length : mitre_groups_default.groups.length).padStart(2, "0") })] }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: layer === "news" ? "REGIONS" : "TECHNIQUES" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: layer === "news" ? String(countries).padStart(2, "0") : selectedGroup.techniques.length })] }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+								onClick: loadNews,
+								disabled: loading,
+								"aria-label": "뉴스 새로고침",
+								children: loading ? "SYNC" : "↻"
+							})
+						]
+					})
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("nav", {
+				className: "source-nav",
+				"aria-label": "정보 레이어 선택",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "layer-switch",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						className: layer === "news" ? "active" : "",
+						onClick: () => {
+							setLayer("news");
+							setSelectedRegion(null);
+							setPanel(true);
+						},
+						children: "LIVE NEWS"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+						className: layer === "mitre" ? "active" : "",
+						onClick: () => {
+							setLayer("mitre");
+							setSelectedRegion(null);
+							setPanel(true);
+						},
+						children: ["MITRE ATT&CK ", /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("em", { children: ["v", mitre_groups_default.dataset.version] })]
+					})]
+				}), layer === "news" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [sources.map((name) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+					onClick: () => setSource(name),
+					className: source === name ? "active" : "",
+					children: [
+						name !== "전체 소스" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { style: { background: sourceColors[name] } }),
+						name,
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("em", { children: name === "전체 소스" ? items.length : items.filter((item) => item.source === name).length })
+					]
+				}, name)), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "source-health",
+					children: statuses.map((status) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						title: status.error || `${status.count}건 수집`,
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { className: status.ok ? "ok" : "bad" }), status.source]
+					}, status.source))
+				})] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "mitre-dataset",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
+						" ENTERPRISE ATT&CK ",
+						mitre_groups_default.dataset.version,
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [new Date(mitre_groups_default.dataset.modified).toLocaleDateString("ko-KR"), " 데이터"] })
+					]
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "atlas-workspace",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", {
+						className: "intel-rail glass-panel",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "rail-heading",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: layer === "news" ? "REAL-TIME NEWS MAPPING" : "REGISTERED ADVERSARY LAYER" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", { children: layer === "news" ? "위협 인텔리전스" : "ATT&CK 그룹 분석" })] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: layer === "news" ? filtered.length : filteredGroups.length })]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+								className: "intel-search",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "⌕" }),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+										value: query,
+										onChange: (event) => setQuery(event.target.value),
+										placeholder: layer === "news" ? "행위자, 국가, CVE 검색" : "APT, 별칭, 표적 검색",
+										"aria-label": "인텔리전스 검색"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("kbd", { children: "⌘ K" })
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "feed-list",
+								children: [layer === "news" ? filtered.map((item, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+									onClick: () => {
+										setActiveId(item.id);
+										setSelectedRegion(null);
+										setPanel(true);
+									},
+									className: `news-card ${item.id === selected?.id && !selectedRegion ? "active" : ""}`,
+									children: [
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											className: "news-meta",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+												className: `severity ${item.severity}`,
+												children: severityLabel(item.severity)
+											}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("time", { children: relativeTime(item.publishedAt) })]
+										}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: item.title }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											className: "news-route",
+											children: [
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { style: { background: sourceColors[item.source] || "#6b8791" } }),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: item.source }),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: item.countryLabel })
+											]
+										}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											className: "card-foot",
+											children: [
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: item.category }),
+												item.mitreGroups[0] ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("em", {
+													className: "mitre-hit",
+													children: ["ATT&CK ", item.mitreGroups[0].id]
+												}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("em", { children: [
+													"GEO ",
+													item.geoConfidence,
+													"%"
+												] }),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: String(index + 1).padStart(2, "0") })
+											]
+										})
+									]
+								}, item.id)) : filteredGroups.map((group) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+									onClick: () => {
+										setActiveGroupId(group.id);
+										setSelectedRegion(null);
+										setPanel(true);
+									},
+									className: `news-card apt-card ${group.id === selectedGroup.id && !selectedRegion ? "active" : ""}`,
+									children: [
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											className: "news-meta",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+												className: "mitre-id",
+												children: group.id
+											}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("time", { children: ["v", group.version] })]
+										}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h2", { children: [group.key, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: group.mitreName !== group.key ? group.mitreName : "MITRE REGISTERED" })] }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: group.operationType }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											className: "news-route",
+											children: [
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { style: { background: group.color } }),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: group.attackerLabel }),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: group.targetLabel })
+											]
+										}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											className: "card-foot",
+											children: [
+												/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [group.techniques.length, " TTP"] }),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("em", { children: [group.references.length, " SOURCES"] }),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "ATT&CK" })
+											]
+										})
+									]
+								}, group.id)), (layer === "news" ? !filtered.length : !filteredGroups.length) && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+									className: "empty-feed",
+									children: "검색 조건에 맞는 인텔리전스가 없습니다."
+								})]
+							})
+						]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+						className: "globe-stage",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "orbital-grid" }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "radar-sweep" }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ThreatGlobe, {
+								items: globeItems,
+								activeId: globeActiveId,
+								selectedRegion,
+								onRegionSelect: handleRegionSelect
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "stage-title",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: layer === "news" ? "LIVE GEOSPATIAL LAYER / WGS84" : `MITRE ATT&CK ${mitre_groups_default.dataset.version} / CASE OVERLAY` }),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: layer === "news" ? "글로벌 사이버 위협 관측망" : "등록 APT 작전 경로" }),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "국가 클릭: 지역 인텔리전스 · 드래그: 회전 · 스크롤: 확대" })
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "risk-index laser-index",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									className: "laser-meter",
+									style: { "--level": `${layer === "news" ? risk : selectedGroup.weight * 18}%` },
+									children: [
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {})
+									]
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									className: "laser-value",
+									children: [
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: layer === "news" ? "THREAT ENERGY" : "CASE ENERGY" }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: layer === "news" ? risk : selectedGroup.weight * 18 }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("em", { children: layer === "news" ? `${criticalCount} CRITICAL` : `${selectedGroup.techniques.length} TTPs` })
+									]
+								})]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "globe-legend",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { className: "critical" }), "치명적"] }),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { className: "high" }), "높음"] }),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { className: "medium" }), "주의"] }),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { className: "low" }), "관찰"] }),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("em", { children: layer === "news" ? "레이저 펄스: 실시간 공격 흐름" : "레이저 펄스: 사례 기반 공격지 → 표적" })
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "coordinate-readout",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: ["LAT ", (selectedRegion?.lat ?? (layer === "news" ? selected?.lat : selectedGroup.targetLoc[0])).toFixed(3)] }),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: ["LNG ", (selectedRegion?.lng ?? (layer === "news" ? selected?.lng : selectedGroup.targetLoc[1])).toFixed(3)] }),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: "WGS 84" })
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+								className: "detail-toggle",
+								onClick: () => setPanel((value) => !value),
+								children: panel ? "패널 닫기" : "인텔 보기"
+							})
+						]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", {
+						className: `detail-rail glass-panel ${panel ? "open" : ""}`,
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+								className: "close-detail",
+								onClick: () => setPanel(false),
+								"aria-label": "상세 패널 닫기",
+								children: "×"
+							}),
+							selectedRegion && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									className: "detail-kicker",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+										className: `region-badge ${regionRecent.length ? "live" : "archive"}`,
+										children: regionRecent.length ? "LIVE REGION" : "HISTORICAL FALLBACK"
+									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("time", { children: regionRecent.length ? "≤ 30 DAYS" : "UP TO 10 YEARS" })]
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", {
+									className: "detail-source",
+									children: "CLICKED GEOGRAPHY / WGS84"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h2", {
+									className: "region-title",
+									children: [selectedRegion.country, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "REGIONAL CYBER ACTIVITY" })]
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+									className: "back-detail",
+									onClick: () => setSelectedRegion(null),
+									children: "← 선택한 기사·APT 상세로 돌아가기"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									className: "region-coordinates",
+									children: [
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: ["LAT ", selectedRegion.lat.toFixed(3)] }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: ["LNG ", selectedRegion.lng.toFixed(3)] }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: "COUNTRY MATCHED" })
+									]
+								}),
+								regionRecent.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+										className: "region-status active",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "RECENT ACTIVITY DETECTED" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("b", { children: [
+											"모니터링 피드에서 최근 공격 징후 ",
+											regionRecent.length,
+											"건"
+										] })] })]
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+										className: "region-summary-grid",
+										children: [
+											/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "HIGH / CRITICAL" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: regionRecent.filter((item) => item.severity === "high" || item.severity === "critical").length })] }),
+											/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "ATT&CK MATCH" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: regionRecent.filter((item) => item.mitreGroups.length > 0).length })] }),
+											/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "SOURCES" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: new Set(regionRecent.map((item) => item.source)).size })] })
+										]
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+										className: "evidence-section region-evidence",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											className: "ttp-heading",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "RECENT ATTACK ACTIVITY" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [regionRecent.length, " SIGNALS"] })]
+										}), regionRecent.slice(0, 8).map((article) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
+											className: "evidence-link live",
+											href: article.link,
+											target: "_blank",
+											rel: "noreferrer",
+											children: [
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
+													article.source,
+													" · ",
+													relativeTime(article.publishedAt),
+													" · ",
+													article.category
+												] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: article.title })] }),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "↗" })
+											]
+										}, article.id))]
+									})
+								] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+									className: "region-status quiet",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "NO RECENT SIGNAL IN MONITORED FEEDS" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: "최근 30일 신호가 없어 과거 사례를 검색했습니다" })] })]
+								}), regionLoading ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									className: "history-loader",
+									children: [
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "HISTORICAL INTELLIGENCE SEARCH" })
+									]
+								}) : regionHistory && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+										className: "history-heading",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "HISTORICAL CASE INDEX" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("b", { children: [regionHistory.articles.length + regionHistory.mitreCases.length, " EVIDENCE LINKS"] })] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+											className: regionHistory.search.ok ? "ok" : "bad",
+											children: regionHistory.search.ok ? "SEARCHED" : "LIMITED"
+										})]
+									}),
+									regionHistory.categories.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+										className: "region-categories",
+										children: regionHistory.categories.map((category) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [category.name, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: category.count })] }, category.name))
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+										className: "evidence-section region-evidence",
+										children: [
+											/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+												className: "ttp-heading",
+												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "PAST NEWS REPORTS" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [regionHistory.articles.length, " FOUND"] })]
+											}),
+											regionHistory.articles.map((article) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
+												className: "evidence-link historical",
+												href: article.link,
+												target: "_blank",
+												rel: "noreferrer",
+												children: [
+													/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
+													/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
+														article.source,
+														" · ",
+														new Date(article.publishedAt).toLocaleDateString("ko-KR"),
+														" · ",
+														article.category
+													] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: article.title })] }),
+													/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "↗" })
+												]
+											}, `${article.link}-${article.publishedAt}`)),
+											!regionHistory.articles.length && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+												className: "region-empty",
+												children: "연결 가능한 과거 보도 사례를 찾지 못했습니다."
+											})
+										]
+									}),
+									regionHistory.mitreCases.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+										className: "mitre-case-section",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											className: "ttp-heading",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "MITRE ATT&CK CASE LINKS" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [regionHistory.mitreCases.length, " GROUPS"] })]
+										}), regionHistory.mitreCases.map((group) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
+											className: "mitre-case",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
+												href: group.mitreUrl,
+												target: "_blank",
+												rel: "noreferrer",
+												children: [
+													/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: group.id }),
+													/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: group.key }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: group.title })] }),
+													/* @__PURE__ */ (0, import_jsx_runtime.jsx)("em", { children: "OFFICIAL ↗" })
+												]
+											}), group.references.map((reference) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
+												className: "case-reference",
+												href: reference.url,
+												target: "_blank",
+												rel: "noreferrer",
+												children: [
+													reference.source,
+													": ",
+													reference.title,
+													" ↗"
+												]
+											}, reference.url))]
+										}, group.id))]
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "region-notice",
+										children: "최근 신호 없음은 공격 부재를 의미하지 않습니다. 표시 결과는 현재 연결된 뉴스 피드와 공개 과거 보도를 기준으로 한 탐색 보조 정보입니다."
+									})
+								] })] })
+							] }),
+							!selectedRegion && layer === "news" && selected && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									className: "detail-kicker",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+										className: `severity ${selected.severity}`,
+										children: severityLabel(selected.severity)
+									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("time", { children: relativeTime(selected.publishedAt) })]
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", {
+									className: "detail-source",
+									children: [selected.source, " / LIVE ARTICLE"]
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: selected.title }),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									className: "geo-route",
+									children: [
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "INGEST POINT" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: selected.originCountry })] }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { children: "→" }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "OBSERVED REGION" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: selected.countryLabel })] })
+									]
+								}),
+								selected.mitreGroups.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+									className: "mitre-match",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "MITRE ATT&CK MATCH" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: "OFFICIAL" })] }), selected.mitreGroups.map((group) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
+										href: group.mitreUrl,
+										target: "_blank",
+										rel: "noreferrer",
+										children: [
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: group.id }),
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: group.key }),
+											/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("em", { children: [
+												"v",
+												group.version,
+												" ↗"
+											] })
+										]
+									}, group.id))]
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+									className: "analysis-card",
+									children: [
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "자동 지역 분류 신뢰도" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("b", { children: [selected.geoConfidence, "%"] })] }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("progress", {
+											value: selected.geoConfidence,
+											max: "100"
+										}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "기사 제목과 요약의 국가·지역·그룹 별칭을 기반으로 한 자동 분류입니다. 공격 주체 귀속은 MITRE 또는 원문 근거가 있을 때만 표시합니다." })
+									]
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+									className: "article-brief",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "ARTICLE ABSTRACT" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: selected.description || "원문에서 최신 보안 인텔리전스를 확인하세요." })]
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									className: "intel-metrics",
+									children: [
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "CATEGORY" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: selected.category })] }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "REGION" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: selected.region })] }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "PUBLISHED" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: new Date(selected.publishedAt).toLocaleDateString("ko-KR") })] })
+									]
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
+									className: "read-source",
+									href: selected.link,
+									target: "_blank",
+									rel: "noreferrer",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "원문 인텔리전스 열기" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: "↗" })]
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+									className: "pipeline-card",
+									children: [
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											className: "pipeline-title",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "INGESTION PIPELINE" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("b", { children: [
+												healthy,
+												"/",
+												statuses.length || 3,
+												" ONLINE"
+											] })]
+										}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											className: "pipeline-flow",
+											children: [
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "RSS" }),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "NLP" }),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "MITRE" }),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "GEO" })
+											]
+										}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "3분 자동 동기화 · 그룹 별칭 매칭 · ATT&CK ID 연결" })
+									]
+								})
+							] }),
+							!selectedRegion && layer === "mitre" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									className: "detail-kicker",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+										className: "mitre-id",
+										children: selectedGroup.id
+									}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("time", { children: ["ATT&CK v", selectedGroup.version] })]
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", {
+									className: "detail-source",
+									children: "MITRE REGISTERED GROUP / CASE OVERLAY"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h2", {
+									className: "apt-title",
+									children: [selectedGroup.key, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: selectedGroup.mitreName })]
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+									className: "apt-description",
+									children: selectedGroup.description
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									className: "operation-route",
+									children: [
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "ORIGIN" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: selectedGroup.attackerLabel })] }),
+										selectedGroup.c2Label && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { children: "→" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "INFRASTRUCTURE" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: selectedGroup.c2Label })] })] }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { children: "→" }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "TARGET" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: selectedGroup.targetLabel })] })
+									]
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+									className: "alias-card",
+									children: [
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "MITRE 공식 연관 그룹명" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: selectedGroup.aliases.length })] }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: selectedGroup.aliases.join(" · ") }),
+										selectedGroup.caseAlias && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("em", { children: ["사례 표기: ", selectedGroup.caseAlias] })
+									]
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+									className: "operation-card",
+									children: [
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "CASE ASSESSMENT" }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: selectedGroup.operationType }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "ATT&CK techniques" }),
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: selectedGroup.techniques.length }),
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "software" }),
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: selectedGroup.software.length })
+										] })
+									]
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+									className: "ttp-section",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+										className: "ttp-heading",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "TACTICS & TECHNIQUES" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [tacticGroups.length, " TACTICS"] })]
+									}), tacticGroups.map(([tactic, techniques]) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+										className: "tactic-row",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: tacticLabels[tactic] || tactic }),
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: tactic.toUpperCase() })
+										] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("ul", { children: [techniques.slice(0, 5).map((technique) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
+											href: technique.url,
+											target: "_blank",
+											rel: "noreferrer",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: technique.id }), technique.name]
+										}) }, `${tactic}-${technique.id}`)), techniques.length > 5 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+											className: "more-techniques",
+											children: [
+												"+ ",
+												techniques.length - 5,
+												" more"
+											]
+										})] })]
+									}, tactic))]
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+									className: "evidence-section",
+									children: [
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											className: "ttp-heading",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "RELATED INTELLIGENCE" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [groupArticles.length, " LIVE"] })]
+										}),
+										groupArticles.map((article) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
+											className: "evidence-link live",
+											href: article.link,
+											target: "_blank",
+											rel: "noreferrer",
+											children: [
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
+													article.source,
+													" · ",
+													relativeTime(article.publishedAt)
+												] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: article.title })] }),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "↗" })
+											]
+										}, article.id)),
+										selectedGroup.references.slice(0, 4).map((reference) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
+											className: "evidence-link",
+											href: reference.url,
+											target: "_blank",
+											rel: "noreferrer",
+											children: [
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: ["MITRE REFERENCE · ", reference.source] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: reference.title })] }),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "↗" })
+											]
+										}, reference.url))
+									]
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
+									className: "read-source mitre-button",
+									href: selectedGroup.mitreUrl,
+									target: "_blank",
+									rel: "noreferrer",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "MITRE 공식 그룹 페이지" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: "↗" })]
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+									className: "data-notice",
+									children: [
+										"지도 경로와 사례 평가는 첨부하신 분석안을 기반으로 하며, TTP·연관 그룹명·참조 링크는 MITRE ATT&CK ",
+										mitre_groups_default.dataset.version,
+										" 공식 STIX 데이터에서 생성했습니다."
+									]
+								})
+							] })
+						]
+					})
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("footer", {
+				className: "atlas-footer",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { className: healthy ? "online" : "offline" }),
+						" COLLECTION PIPELINE ",
+						healthy ? "OPERATIONAL" : "DEGRADED"
+					] }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: layer === "news" ? "공식 RSS 기반 · 자동 추론은 사실 귀속이 아님" : `MITRE ATT&CK ${mitre_groups_default.dataset.version} · 사례 좌표는 사용자 분석 기반` }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: "CYBER ATLAS / LIVE OSINT" })
+				]
+			})
+		]
+	});
+}
+//#endregion
+export { Home as default };
