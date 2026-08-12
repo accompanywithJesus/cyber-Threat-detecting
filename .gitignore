@@ -22,6 +22,12 @@
 .DS_Store
 *.pem
 
+# archives
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
 # debug
 npm-debug.log*
 yarn-debug.log*

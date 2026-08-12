@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cyber-atlas",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Single source of truth for bindings. `@cloudflare/vite-plugin` reads this for
+  // local dev and copies it into dist/server/wrangler.json at build time, which is
+  // the config `npm run deploy` hands to wrangler. `assets` is injected by the
+  // plugin (dist/client), so it is deliberately not declared here.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cyber-atlas-db",
+      // Fill in with the id printed by `npm run db:create` (wrangler d1 create).
+      // Until then, local dev works and remote deploy will be rejected by wrangler.
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "drizzle"
+    }
+  ],
+
+  "observability": { "enabled": true }
+}

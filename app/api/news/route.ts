@@ -1,10 +1,22 @@
 import { XMLParser } from "fast-xml-parser";
+import { desc, sql } from "drizzle-orm";
+import { getDb } from "@/db";
+import { articles, sourceStatus } from "@/db/schema";
 import mitreData from "../../data/mitre-groups.json";
 
 export const dynamic = "force-dynamic";
 
 type SourceName = "The Hacker News" | "SecurityWeek" | "보안뉴스";
 type FeedItem = Record<string, unknown>;
+type Severity = "critical" | "high" | "medium" | "low";
+type MitreMatch = { id: string; key: string; mitreName: string; aliases: string[]; mitreUrl: string; version: string };
+type CollectedItem = {
+  id: string; title: string; description: string; link: string; source: SourceName; publishedAt: string;
+  country: string; countryLabel: string; region: string; lat: number; lng: number;
+  originCountry: string; originLat: number; originLng: number; geoConfidence: number;
+  severity: Severity; category: string; mitreGroups: MitreMatch[];
+};
+type SourceReport = { source: SourceName; ok: boolean; count: number; error?: string };
 
 const SOURCES: { name: SourceName; urls: string[]; home: string; base: [number, number] }[] = [
   { name: "The Hacker News", urls: ["https://feeds.feedburner.com/TheHackersNews"], home: "https://thehackernews.com/", base: [20.59, 78.96] },
@@ -107,9 +119,118 @@ async function fetchSource(source: typeof SOURCES[number]) {
   return { source: source.name, ok: false, count: 0, error: lastError, items: [] };
 }
 
+async function persist(items: CollectedItem[], statuses: SourceReport[]) {
+  try {
+    const db = getDb();
+    if (items.length) {
+      // One upsert statement per article (not one multi-row VALUES insert) — D1 caps
+      // bound parameters per statement, and a 42-row x 17-column batch exceeds it.
+      const upserts = items.map((item) =>
+        db.insert(articles).values({
+          link: item.link,
+          title: item.title,
+          description: item.description,
+          source: item.source,
+          publishedAt: item.publishedAt,
+          severity: item.severity,
+          category: item.category,
+          country: item.country,
+          countryLabel: item.countryLabel,
+          region: item.region,
+          lat: item.lat,
+          lng: item.lng,
+          originCountry: item.originCountry,
+          originLat: item.originLat,
+          originLng: item.originLng,
+          geoConfidence: item.geoConfidence,
+          mitreGroups: item.mitreGroups,
+        }).onConflictDoUpdate({
+          target: articles.link,
+          set: {
+            title: sql`excluded.title`,
+            description: sql`excluded.description`,
+            source: sql`excluded.source`,
+            publishedAt: sql`excluded.published_at`,
+            severity: sql`excluded.severity`,
+            category: sql`excluded.category`,
+            country: sql`excluded.country`,
+            countryLabel: sql`excluded.country_label`,
+            region: sql`excluded.region`,
+            lat: sql`excluded.lat`,
+            lng: sql`excluded.lng`,
+            originCountry: sql`excluded.origin_country`,
+            originLat: sql`excluded.origin_lat`,
+            originLng: sql`excluded.origin_lng`,
+            geoConfidence: sql`excluded.geo_confidence`,
+            mitreGroups: sql`excluded.mitre_groups`,
+          },
+        })
+      );
+      const [first, ...rest] = upserts;
+      await db.batch([first, ...rest]);
+    }
+    if (statuses.length) {
+      const checkedAt = new Date().toISOString();
+      await db.insert(sourceStatus).values(statuses.map((status) => ({
+        source: status.source,
+        ok: status.ok,
+        count: status.count,
+        error: status.error ?? null,
+        checkedAt,
+      }))).onConflictDoUpdate({
+        target: sourceStatus.source,
+        set: {
+          ok: sql`excluded.ok`,
+          count: sql`excluded.count`,
+          error: sql`excluded.error`,
+          checkedAt: sql`excluded.checked_at`,
+        },
+      });
+    }
+  } catch {
+    // D1 unavailable or not migrated yet — live response must still succeed.
+  }
+}
+
+async function loadFallbackFromDb(): Promise<CollectedItem[]> {
+  try {
+    const db = getDb();
+    const rows = await db.select().from(articles).orderBy(desc(articles.publishedAt)).limit(42);
+    return rows.map((row) => ({
+      id: hash(`${row.source}:${row.link}`),
+      title: row.title,
+      description: row.description,
+      link: row.link,
+      source: row.source as SourceName,
+      publishedAt: row.publishedAt ?? row.ingestedAt,
+      country: row.country,
+      countryLabel: row.countryLabel,
+      region: row.region,
+      lat: row.lat,
+      lng: row.lng,
+      originCountry: row.originCountry,
+      originLat: row.originLat,
+      originLng: row.originLng,
+      geoConfidence: row.geoConfidence,
+      severity: row.severity as Severity,
+      category: row.category,
+      mitreGroups: row.mitreGroups,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export async function GET() {
   const results = await Promise.all(SOURCES.map(fetchSource));
   const seen = new Set<string>();
-  const items = results.flatMap(result => result.items).sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt)).filter(item=>{const key=item.link.replace(/\?.*$/,"").replace(/\/$/,"");if(seen.has(key))return false;seen.add(key);return true}).slice(0, 42);
-  return Response.json({ items, sources: results.map(({items: _items, ...status})=>status), updatedAt: new Date().toISOString(), refreshSeconds: 180 }, { headers: { "Cache-Control": "public, max-age=30, s-maxage=180, stale-while-revalidate=600", "Access-Control-Allow-Origin": "*" } });
+  const liveItems = results.flatMap(result => result.items).sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt)).filter(item=>{const key=item.link.replace(/\?.*$/,"").replace(/\/$/,"");if(seen.has(key))return false;seen.add(key);return true}).slice(0, 42);
+  const statuses: SourceReport[] = results.map((result) => ({ source: result.source, ok: result.ok, count: result.count, error: result.error }));
+
+  await persist(liveItems, statuses);
+
+  const degraded = liveItems.length === 0;
+  const items = degraded ? await loadFallbackFromDb() : liveItems;
+
+  return Response.json({ items, sources: statuses, updatedAt: new Date().toISOString(), refreshSeconds: 180, degraded }, { headers: { "Cache-Control": "public, max-age=30, s-maxage=180, stale-while-revalidate=600", "Access-Control-Allow-Origin": "*" } });
 }

@@ -1,98 +1,132 @@
-# vinext-starter
+# Cyber Atlas
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+A geopolitical cyber threat observatory. Cyber Atlas collects security news from
+public RSS feeds, enriches each article with severity, category, geography and
+MITRE ATT&CK group matches, and plots the result on an interactive 3D globe
+alongside a curated dataset of registered APT groups.
 
-## Prerequisites
+The interface is in Korean; the codebase and documentation are in English.
+
+**Stack:** [vinext](https://github.com/cloudflare/vinext) (Next.js App Router
+compatibility layer) on Cloudflare Workers · Cloudflare D1 + Drizzle ORM ·
+three.js + three-globe · React 19.
+
+## Features
+
+- **Live OSINT collection** — three RSS sources are fetched in parallel, each
+  isolated so one dead feed cannot take down the rest.
+- **Automatic enrichment** — keyword-based severity and category inference,
+  MITRE ATT&CK group matching by official alias, and country/region inference
+  producing an estimated attacker → target pair.
+- **Persistent archive** — every collection run upserts into D1 keyed on article
+  link, so the observatory accumulates a time series instead of starting fresh
+  on each request.
+- **Never goes blank** — if every feed fails (blocked egress, upstream outage),
+  the API serves the stored archive and flags the response `degraded`, which the
+  UI surfaces as an explicit archive-fallback banner.
+- **ATT&CK case layer** — nine China-linked APT groups with attacker → C2 →
+  target coordinates, techniques, software and source references drawn from
+  MITRE ATT&CK.
+
+## Requirements
 
 - Node.js `>=22.13.0`
+- A Cloudflare account (for deployment)
 
-## Quick Start
+## Local development
 
 ```bash
 npm install
-npm run dev
-npm run build
+npm run db:migrate:local   # apply the schema to the local D1 instance (once)
+npm run dev                # http://localhost:3000
 ```
 
-This starter does not use `wrangler.jsonc`.
+## Deployment
 
-## Included Shape
+This repository is not tied to any managed platform. It deploys directly to
+Cloudflare Workers.
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
-
-## Workspace Auth Headers
-
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```bash
+wrangler login             # once, interactive OAuth
+npm run db:create          # create the D1 database
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+Copy the `database_id` printed by `db:create` into `d1_databases[0].database_id`
+in `wrangler.jsonc`, then:
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+```bash
+npm run db:migrate         # apply migrations to the remote D1
+npm run deploy             # build and deploy
+```
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
+Use `npm run deploy:dry` to validate the config, bundle and bindings **without
+authenticating** — it is the fastest way to diagnose a broken deploy.
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
+`wrangler.jsonc` is the single source of truth for the worker name and its
+bindings. At build time `@cloudflare/vite-plugin` copies it to
+`dist/server/wrangler.json`, which is the config `npm run deploy` hands to
+wrangler.
 
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
+## Scripts
 
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
+| Command | Description |
+|---|---|
+| `npm run dev` | Local dev server with D1 bindings |
+| `npm run build` | Production build |
+| `npm test` | Build, then run the API contract suite |
+| `npm run lint` | ESLint |
+| `npm run deploy` | Build and deploy to Cloudflare Workers |
+| `npm run deploy:dry` | Validate the deploy without authenticating |
+| `npm run db:create` | Create the D1 database |
+| `npm run db:generate` | Generate migration SQL from schema changes |
+| `npm run db:migrate` | Apply migrations to the remote D1 |
+| `npm run db:migrate:local` | Apply migrations to the local D1 |
 
-## Useful Commands
+## Tests
 
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
+`tests/api-contract.test.mjs` loads the built Worker and drives it the way the
+Cloudflare runtime does. Outbound `fetch` is stubbed so feed behaviour is
+deterministic, and D1 is backed by Node's built-in SQLite, so real SQL runs
+against the real migration.
 
-## Learn More
+The suite covers the response contract of `/api/news` and `/api/history`, the
+enrichment pipeline, link-keyed upserts, `/api/history` soft-failure and input
+validation, and — most importantly — that a total feed outage falls back to the
+stored archive instead of emptying the map.
 
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+```bash
+npm test
+```
+
+## Project layout
+
+```
+app/
+  page.tsx              single client shell (state, filters, detail panel)
+  components/           ThreatGlobe (three-globe renderer)
+  data/                 mitre-groups.json (curated APT dataset)
+  api/news/             RSS collection, enrichment, D1 upsert, archive fallback
+  api/history/          time-series queries over the archive
+  api/region-intel/     historical search via Google News RSS
+db/                     Drizzle schema and D1 client
+drizzle/                generated migrations
+tests/                  API contract suite
+worker/index.ts         Workers fetch entry point
+wrangler.jsonc          worker name and bindings
+```
+
+Project context and roadmap live in [CLAUDE.md](CLAUDE.md).
+
+## Known limitations
+
+- **Collection is request-triggered, not scheduled.** Articles accumulate only
+  when someone hits `/api/news`. Moving ingestion to a Cron Trigger is the next
+  planned step.
+- **Attribution is heuristic, not authoritative.** Target and origin countries
+  are inferred from the order in which place names appear in the text, so they
+  can invert. `geoConfidence` reflects match presence, not calibrated
+  confidence. Nothing here should be read as formal attribution.
+- **Worker bundle is larger than it needs to be.** `three` and `three-globe` are
+  client-only but are pulled into the SSR graph, inflating the upload to roughly
+  1.3 MB gzipped (the free-tier limit is 3 MB). Excluding them from the server
+  build is a known improvement.

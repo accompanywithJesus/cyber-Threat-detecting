@@ -1,17 +1,22 @@
 {
-  "name": "site-creator-vinext-starter",
+  "name": "cyber-atlas",
   "version": "0.1.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
-    "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
-    "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs",
+    "dev": "vinext dev",
+    "build": "vinext build",
+    "start": "vinext start",
+    "deploy": "npm run build && wrangler deploy -c dist/server/wrangler.json",
+    "deploy:dry": "npm run build && wrangler deploy -c dist/server/wrangler.json --dry-run",
+    "test": "npm run build && node --test \"tests/**/*.test.mjs\"",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "db:create": "wrangler d1 create cyber-atlas-db",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "wrangler d1 migrations apply cyber-atlas-db --remote",
+    "db:migrate:local": "wrangler d1 migrations apply cyber-atlas-db --local"
   },
   "dependencies": {
     "d3-geo": "^3.1.1",
